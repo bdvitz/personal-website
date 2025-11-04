@@ -1,5 +1,8 @@
 # Personal Website - Root .gitignore
 
+# claude inputs
+.claude/
+
 # Operating System
 .DS_Store
 .DS_Store?
@@ -32,6 +35,10 @@ yarn-error.log*
 .env.development.local
 .env.test.local
 .env.production.local
+
+# Spring Boot local configuration with credentials
+application-local.properties
+**/application-local.properties
 
 # Temporary files
 *.tmp
