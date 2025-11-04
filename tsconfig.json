@@ -1,0 +1,21 @@
+{
+  "extends": "./client/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["client/*"]
+    }
+  },
+  "include": [
+    "client",
+    "server",
+    "docs",
+    "ARCHITECTURE.md",
+    "README.md"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "target"
+  ]
+}
