@@ -10,7 +10,7 @@ interface WinLossChartProps {
   }
 }
 
-const COLORS = ['#22c55e', '#ef4444', '#3b82f6']
+const COLORS = ['#22c55e', '#ef4444', '#3b82f6'] // Green, Red, Blue
 
 export default function WinLossChart({ stats }: WinLossChartProps) {
   const data = [
@@ -20,19 +20,19 @@ export default function WinLossChart({ stats }: WinLossChartProps) {
   ]
 
   const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const total = stats.wins + stats.losses + stats.draws
-      const percentage = ((payload[0].value / total) * 100).toFixed(1)
-      return (
-        <div className="bg-gray-900/95 backdrop-blur-lg border border-white/20 rounded-lg p-4 shadow-xl">
-          <p className="text-white font-semibold">{payload[0].name}</p>
-          <p className="text-sm text-purple-200">
-            {payload[0].value} games ({percentage}%)
-          </p>
-        </div>
-      )
-    }
-    return null
+    if (!active || !payload?.length) return null
+
+    const total = stats.wins + stats.losses + stats.draws
+    const percentage = ((payload[0].value / total) * 100).toFixed(1)
+
+    return (
+      <div className="bg-gray-900/95 backdrop-blur-lg border border-white/20 rounded-lg p-4 shadow-xl">
+        <p className="text-white font-semibold">{payload[0].name}</p>
+        <p className="text-sm text-purple-200">
+          {payload[0].value} games ({percentage}%)
+        </p>
+      </div>
+    )
   }
 
   return (
@@ -45,18 +45,14 @@ export default function WinLossChart({ stats }: WinLossChartProps) {
           labelLine={false}
           label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
           outerRadius={100}
-          fill="#8884d8"
           dataKey="value"
         >
           {data.map((entry, index) => (
-            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+            <Cell key={`cell-${index}`} fill={COLORS[index]} />
           ))}
         </Pie>
         <Tooltip content={<CustomTooltip />} />
-        <Legend 
-          wrapperStyle={{ color: 'white' }}
-          iconType="circle"
-        />
+        <Legend wrapperStyle={{ color: 'white' }} iconType="circle" />
       </PieChart>
     </ResponsiveContainer>
   )

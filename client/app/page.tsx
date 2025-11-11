@@ -4,7 +4,6 @@ import Link from 'next/link'
 export default function Home() {
   return (
     <div className="space-y-12 animate-fade-in">
-      {/* Hero Section */}
       <div className="text-center py-12">
         <h1 className="text-6xl font-bold mb-6 text-gradient-primary">
           Welcome to Coding Stats
@@ -14,9 +13,8 @@ export default function Home() {
         </p>
       </div>
 
-      {/* Feature Cards */}
+      {/* Main feature cards */}
       <div className="grid md:grid-cols-3 gap-8">
-        {/* LeetCode Card */}
         <Link href="/leetcode">
           <div className="card card-hover group cursor-pointer">
             <Code className="w-16 h-16 text-green-400 mb-4 group-hover:scale-110 transition-transform duration-300" />
@@ -30,7 +28,6 @@ export default function Home() {
           </div>
         </Link>
 
-        {/* Project Euler Card */}
         <Link href="/project-euler">
           <div className="card card-hover group cursor-pointer">
             <BookOpen className="w-16 h-16 text-blue-400 mb-4 group-hover:scale-110 transition-transform duration-300" />
@@ -44,7 +41,6 @@ export default function Home() {
           </div>
         </Link>
 
-        {/* Chess Stats Card */}
         <Link href="/chess">
           <div className="card card-hover group cursor-pointer">
             <Trophy className="w-16 h-16 text-yellow-400 mb-4 group-hover:scale-110 transition-transform duration-300" />

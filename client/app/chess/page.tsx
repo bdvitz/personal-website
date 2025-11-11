@@ -28,6 +28,7 @@ export default function ChessPage() {
   const [error, setError] = useState<string | null>(null)
   const [days, setDays] = useState(30)
 
+  // Fetch both current stats and historical chart data
   const fetchData = async () => {
     try {
       setError(null)
@@ -45,6 +46,7 @@ export default function ChessPage() {
     }
   }
 
+  // Force refresh from Chess.com API
   const handleRefresh = async () => {
     setRefreshing(true)
     try {
@@ -57,6 +59,7 @@ export default function ChessPage() {
     }
   }
 
+  // Re-fetch data when time period changes
   useEffect(() => {
     fetchData()
   }, [days])
