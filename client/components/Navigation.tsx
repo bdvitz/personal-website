@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Code, BookOpen, Trophy, Home } from 'lucide-react'
+import { Code, Blocks, BookOpen, Trophy, Home } from 'lucide-react'
 
 export default function Navigation() {
   const pathname = usePathname()
@@ -12,6 +12,7 @@ export default function Navigation() {
     { href: '/leetcode', label: 'LeetCode', icon: Code, gradient: 'from-green-500 to-green-600' },
     { href: '/project-euler', label: 'Project Euler', icon: BookOpen, gradient: 'from-blue-500 to-blue-600' },
     { href: '/chess', label: 'Chess', icon: Trophy, gradient: 'from-yellow-500 to-yellow-600' },
+    { href: '/cubing', label: "Cubing", icon: Blocks, gradient: 'from-red-500 to-red-600' }
   ]
 
   return (
@@ -21,10 +22,10 @@ export default function Navigation() {
           <div className="flex flex-col lg:flex-row items-center justify-between gap-4">
             <Link href="/" className="flex items-center space-x-3 group">
               <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-pink-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-all duration-300 shadow-lg hover:shadow-2xl">
-                <span className="text-white font-bold text-2xl">B</span>
+                <span className="text-white font-bold text-2xl">BV</span>
               </div>
               <span className="text-2xl font-bold text-white group-hover:text-purple-300 transition-colors duration-200">
-                bdvitz
+                Home
               </span>
             </Link>
 
