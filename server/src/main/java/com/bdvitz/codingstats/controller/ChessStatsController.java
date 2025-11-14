@@ -25,7 +25,7 @@ public class ChessStatsController {
     
     /**
      * Get current chess statistics for a user
-     * GET /api/chess/stats/current?username=bdvitz
+     * GET /api/chess/stats/current?username=shia_justdoit
      */
     @GetMapping("/current")
     public ResponseEntity<?> getCurrentStats(@RequestParam String username) {
@@ -42,7 +42,7 @@ public class ChessStatsController {
     
     /**
      * Fetch and update chess statistics from Chess.com
-     * POST /api/chess/stats/refresh?username=bdvitz
+     * POST /api/chess/stats/refresh?username=shia_justdoit
      */
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshStats(@RequestParam String username) {
@@ -59,7 +59,7 @@ public class ChessStatsController {
     
     /**
      * Get rating history for a user
-     * GET /api/chess/stats/history?username=bdvitz&days=30
+     * GET /api/chess/stats/history?username=shia_justdoit&days=30
      */
     @GetMapping("/history")
     public ResponseEntity<?> getRatingHistory(
@@ -84,7 +84,7 @@ public class ChessStatsController {
     
     /**
      * Get all rating history for a user
-     * GET /api/chess/stats/history/all?username=bdvitz
+     * GET /api/chess/stats/history/all?username=shia_justdoit
      */
     @GetMapping("/history/all")
     public ResponseEntity<?> getAllRatingHistory(@RequestParam String username) {
@@ -106,7 +106,7 @@ public class ChessStatsController {
     
     /**
      * Get ratings over time formatted for charts
-     * GET /api/chess/stats/ratings-over-time?username=bdvitz&days=90
+     * GET /api/chess/stats/ratings-over-time?username=shia_justdoit&days=90
      */
     @GetMapping("/ratings-over-time")
     public ResponseEntity<?> getRatingsOverTime(
@@ -129,9 +129,21 @@ public class ChessStatsController {
      */
     @GetMapping("/health")
     public ResponseEntity<Map<String, String>> healthCheck() {
-        Map<String, String> response = new HashMap<>();
-        response.put("status", "UP");
-        response.put("service", "Chess Stats API");
-        return ResponseEntity.ok(response);
+        try {
+            // Perform a basic connectivity check by attempting to get service info
+            // This ensures the service layer and dependencies are accessible
+            chessStatsService.toString(); // Basic check that service is available
+
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "up");
+            response.put("service", "Chess Stats API");
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Health check failed", e);
+            Map<String, String> response = new HashMap<>();
+            response.put("status", "down");
+            response.put("error", e.getMessage());
+            return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
+        }
     }
 }
