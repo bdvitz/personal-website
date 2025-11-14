@@ -20,10 +20,10 @@ public class ChessStatsScheduler {
     private String chessUsername;
     
     /**
-     * Scheduled task to fetch chess stats daily at midnight UTC
-     * Cron expression: "0 0 0 * * *" = Every day at 00:00:00
+     * Scheduled task to fetch chess stats daily at 3 AM UTC
+     * Cron expression: "0 0 3 * * *" = Every day at 03:00:00
      */
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 0 3 * * *")
     public void fetchDailyChessStats() {
         logger.info("Starting scheduled chess stats fetch for user: {}", chessUsername);
         
@@ -34,20 +34,4 @@ public class ChessStatsScheduler {
             logger.error("Error during scheduled chess stats fetch", e);
         }
     }
-    
-    /**
-     * Optional: Run every hour for more frequent updates during testing
-     * Uncomment to use during development
-     */
-    // @Scheduled(cron = "0 0 * * * *")
-    // public void fetchHourlyChessStats() {
-    //     logger.info("Starting hourly chess stats fetch for user: {}", chessUsername);
-    //     
-    //     try {
-    //         chessStatsService.fetchAndStoreStats(chessUsername);
-    //         logger.info("Successfully completed hourly chess stats fetch");
-    //     } catch (Exception e) {
-    //         logger.error("Error during hourly chess stats fetch", e);
-    //     }
-    // }
 }
