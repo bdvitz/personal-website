@@ -76,6 +76,10 @@ public class ChessComApiService {
                 if (!lastNode.isMissingNode()) {
                     return lastNode.path("rating").asInt(0);
                 }
+                lastNode = gameModeNode.path("highest");  // fallback to highest if last is not available
+                if (!lastNode.isMissingNode()) {
+                    return lastNode.path("rating").asInt(0);
+                }
             }
         } catch (Exception e) {
             logger.warn("Could not extract rating for game mode: {}", gameMode);
