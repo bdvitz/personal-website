@@ -57,7 +57,7 @@ export default function Home() {
         <Link href="/cubing">
           <div className="card card-hover group cursor-pointer">
             <Blocks className="w-16 h-16 text-red-400 mb-4 group-hover:scale-110 transition-transform duration-300" />
-            <h2 className="text-3xl font-bold text-white mb-3">Rubic's Cubes</h2>
+            <h2 className="text-3xl font-bold text-white mb-3">Rubik's Cubes</h2>
             <p className="text-purple-200 leading-relaxed">
               Documentation of my cubing journey and samples of art mosaics
             </p>
@@ -80,7 +80,7 @@ export default function Home() {
             <li>LeetCode problem solutions with detailed explanations</li>
             <li>Project Euler mathematical coding challenges</li>
             <li>Refreshable Chess.com statistics tracking using Railway PostgreSQL</li>
-            <li>Rubic's Cube hobby and art mosaics</li>
+            <li>Rubik's Cube hobby and art mosaics</li>
           </ul>
           <p>
             Built with <span className="font-semibold text-white">Next.js</span>, <span className="font-semibold text-white">Spring Boot</span>, and <span className="font-semibold text-white">PostgreSQL</span>.
