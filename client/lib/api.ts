@@ -51,4 +51,43 @@ export const getRatingsOverTime = async (username: string, days: number = 90) =>
   }
 }
 
+// Get ratings for a custom date range
+export const getRatingsByDateRange = async (username: string, startDate: string, endDate: string) => {
+  try {
+    const response = await apiClient.get(`/api/chess/stats/ratings-by-date-range`, {
+      params: { username, startDate, endDate }
+    })
+    return response.data
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || 'Failed to fetch ratings by date range')
+  }
+}
+
+// Import historical game data from Chess.com
+export const importHistoricalData = async (
+  username: string,
+  startYear: number,
+  startMonth: number,
+  endYear: number,
+  endMonth: number
+) => {
+  try {
+    const params: any = {
+      username,
+      startYear,
+      startMonth,
+      endYear,
+      endMonth
+    }
+
+    const response = await apiClient.post(`/api/chess/stats/import-history`, null, {
+      params,
+      timeout: 600000, // 10 minute timeout for long imports
+    })
+    return response.data
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || 'Failed to import historical data')
+  }
+}
+
 export default apiClient

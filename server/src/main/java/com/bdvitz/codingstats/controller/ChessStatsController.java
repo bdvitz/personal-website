@@ -3,6 +3,7 @@ package com.bdvitz.codingstats.controller;
 import com.bdvitz.codingstats.model.ChessStat;
 import com.bdvitz.codingstats.model.DailyRating;
 import com.bdvitz.codingstats.service.ChessStatsService;
+import com.bdvitz.codingstats.service.GameHistoryService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -17,11 +18,14 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/chess/stats")
 public class ChessStatsController {
-    
+
     private static final Logger logger = LoggerFactory.getLogger(ChessStatsController.class);
-    
+
     @Autowired
     private ChessStatsService chessStatsService;
+
+    @Autowired
+    private GameHistoryService gameHistoryService;
     
     /**
      * Get current chess statistics for a user
@@ -122,7 +126,57 @@ public class ChessStatsController {
                     .body(Map.of("error", e.getMessage()));
         }
     }
+
+    /**
+     * Get ratings by custom date range formatted for charts
+     * GET /api/chess/stats/ratings-by-date-range?username=shia_justdoit&startDate=2023-01-01&endDate=2023-12-31
+     */
+    @GetMapping("/ratings-by-date-range")
+    public ResponseEntity<?> getRatingsByDateRange(
+            @RequestParam String username,
+            @RequestParam String startDate,
+            @RequestParam String endDate) {
+        try {
+            logger.info("Fetching ratings by date range for user: {} from {} to {}", username, startDate, endDate);
+
+            java.time.LocalDate start = java.time.LocalDate.parse(startDate);
+            java.time.LocalDate end = java.time.LocalDate.parse(endDate);
+
+            Map<String, Object> chartData = chessStatsService.getRatingsByDateRange(username, start, end);
+            return ResponseEntity.ok(chartData);
+        } catch (Exception e) {
+            logger.error("Error fetching ratings by date range", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
     
+    /**
+     * Import historical game data from Chess.com
+     * POST /api/chess/stats/import-history?username=shia_justdoit&startYear=2020&startMonth=1&endYear=2025&endMonth=11
+     */
+    @PostMapping("/import-history")
+    public ResponseEntity<?> importHistoricalData(
+            @RequestParam String username,
+            @RequestParam(defaultValue = "2020") int startYear,
+            @RequestParam(defaultValue = "1") int startMonth,
+            @RequestParam(required = false) Integer endYear,
+            @RequestParam(required = false) Integer endMonth) {
+        try {
+            logger.info("Starting historical data import for user: {} from {}/{} to {}/{}",
+                    username, startYear, startMonth, endYear, endMonth);
+
+            Map<String, Object> result = gameHistoryService.importHistoricalData(
+                    username, startYear, startMonth, endYear, endMonth);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            logger.error("Error importing historical data", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage(), "status", "failed"));
+        }
+    }
+
     /**
      * Health check endpoint
      * GET /api/chess/stats/health

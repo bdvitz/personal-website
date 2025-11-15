@@ -69,6 +69,7 @@ export default function RatingChart({ data }: RatingChartProps) {
             strokeWidth={2}
             dot={{ r: 3 }}
             activeDot={{ r: 6 }}
+            connectNulls={false}
           />
         ))}
       </LineChart>

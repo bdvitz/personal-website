@@ -119,40 +119,76 @@ public class ChessStatsService {
      */
     public Map<String, Object> getRatingsOverTime(String username, int days) {
         List<DailyRating> history = getRatingHistory(username, days);
-        
+        return formatChartData(history);
+    }
+
+    /**
+     * Get formatted data for charts by date range
+     */
+    public Map<String, Object> getRatingsByDateRange(String username, LocalDate startDate, LocalDate endDate) {
+        List<DailyRating> history = dailyRatingRepository.findByUsernameAndDateBetween(username, startDate, endDate);
+        return formatChartData(history);
+    }
+
+    /**
+     * Format rating history into chart data with proper date spacing
+     * Fills in missing dates with null values to show gaps in the chart
+     */
+    private Map<String, Object> formatChartData(List<DailyRating> history) {
         Map<String, Object> chartData = new HashMap<>();
-        
-        // Extract dates as labels
-        List<String> labels = history.stream()
-                .map(rating -> rating.getDate().toString())
-                .collect(Collectors.toList());
-        
-        // Extract rating data for each game mode
+
+        if (history.isEmpty()) {
+            chartData.put("labels", new ArrayList<>());
+            chartData.put("datasets", new ArrayList<>());
+            return chartData;
+        }
+
+        // Find the date range
+        LocalDate startDate = history.get(0).getDate();
+        LocalDate endDate = history.get(history.size() - 1).getDate();
+
+        // Create a map for quick lookup of ratings by date
+        Map<LocalDate, DailyRating> ratingsByDate = history.stream()
+                .collect(Collectors.toMap(DailyRating::getDate, rating -> rating));
+
+        // Generate all dates in the range
+        List<String> labels = new ArrayList<>();
+        List<Integer> rapidRatings = new ArrayList<>();
+        List<Integer> blitzRatings = new ArrayList<>();
+        List<Integer> bulletRatings = new ArrayList<>();
+        List<Integer> puzzleRatings = new ArrayList<>();
+
+        LocalDate currentDate = startDate;
+        while (!currentDate.isAfter(endDate)) {
+            labels.add(currentDate.toString());
+
+            DailyRating rating = ratingsByDate.get(currentDate);
+            if (rating != null) {
+                rapidRatings.add(rating.getRapidRating());
+                blitzRatings.add(rating.getBlitzRating());
+                bulletRatings.add(rating.getBulletRating());
+                puzzleRatings.add(rating.getPuzzleRating());
+            } else {
+                // Add null for dates with no data (creates gaps in the chart)
+                rapidRatings.add(null);
+                blitzRatings.add(null);
+                bulletRatings.add(null);
+                puzzleRatings.add(null);
+            }
+
+            currentDate = currentDate.plusDays(1);
+        }
+
+        // Create datasets
         List<Map<String, Object>> datasets = new ArrayList<>();
-        
-        // Rapid ratings
-        datasets.add(createDataset("Rapid", history.stream()
-                .map(DailyRating::getRapidRating)
-                .collect(Collectors.toList()), "#22c55e"));
-        
-        // Blitz ratings
-        datasets.add(createDataset("Blitz", history.stream()
-                .map(DailyRating::getBlitzRating)
-                .collect(Collectors.toList()), "#3b82f6"));
-        
-        // Bullet ratings
-        datasets.add(createDataset("Bullet", history.stream()
-                .map(DailyRating::getBulletRating)
-                .collect(Collectors.toList()), "#ef4444"));
-        
-        // Puzzle ratings
-        datasets.add(createDataset("Puzzle", history.stream()
-                .map(DailyRating::getPuzzleRating)
-                .collect(Collectors.toList()), "#a855f7"));
-        
+        datasets.add(createDataset("Rapid", rapidRatings, "#22c55e"));
+        datasets.add(createDataset("Blitz", blitzRatings, "#3b82f6"));
+        datasets.add(createDataset("Bullet", bulletRatings, "#ef4444"));
+        datasets.add(createDataset("Puzzle", puzzleRatings, "#a855f7"));
+
         chartData.put("labels", labels);
         chartData.put("datasets", datasets);
-        
+
         return chartData;
     }
     

@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.http.HttpStatus;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -96,7 +97,8 @@ public class ChessComApiService {
         int totalLosses = 0;
         int totalDraws = 0;
         
-        String[] gameModes = {"chess_rapid", "chess_blitz", "chess_bullet", "chess_daily"};
+        String[] gameModes = {"chess_rapid", "chess_blitz", "chess_bullet"};
+        // String[] gameModes = {"chess_rapid", "chess_blitz", "chess_bullet", "chess_daily"};  // daily mode can be included if needed
         
         for (String mode : gameModes) {
             JsonNode modeNode = rootNode.path(mode);
@@ -134,5 +136,71 @@ public class ChessComApiService {
             logger.error("Error checking if user exists: {}", username, e);
             return false;
         }
+    }
+
+    /**
+     * Fetch game archives for a specific month with retry logic for rate limiting
+     * @param username Chess.com username
+     * @param year Year (e.g., 2025)
+     * @param month Month (1-12)
+     * @return JsonNode containing games array, or null if no games available
+     */
+    public JsonNode fetchMonthlyGames(String username, int year, int month) {
+        int maxRetries = 5;
+        int retryCount = 0;
+        long baseDelayMs = 1000; // Start with 1 second
+
+        while (retryCount < maxRetries) {
+            try {
+                String gamesUrl = String.format("%s%s/games/%d/%02d",
+                    CHESS_COM_API_BASE, username, year, month);
+
+                logger.info("Fetching games from: {} (attempt {}/{})", gamesUrl, retryCount + 1, maxRetries);
+                String response = restTemplate.getForObject(gamesUrl, String.class);
+
+                if (response != null) {
+                    JsonNode rootNode = objectMapper.readTree(response);
+                    logger.info("Successfully fetched games for {}/{} - {} games found",
+                        year, month, rootNode.path("games").size());
+                    return rootNode;
+                }
+
+            } catch (HttpClientErrorException e) {
+                if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
+                    retryCount++;
+                    // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+                    long delayMs = baseDelayMs * (1L << (retryCount - 1));
+
+                    logger.warn("Rate limited (429) for {}/{}. Retry {}/{} after {}ms",
+                        year, month, retryCount, maxRetries, delayMs);
+
+                    if (retryCount < maxRetries) {
+                        try {
+                            Thread.sleep(delayMs);
+                        } catch (InterruptedException ie) {
+                            Thread.currentThread().interrupt();
+                            logger.error("Retry sleep interrupted", ie);
+                            return null;
+                        }
+                        continue;
+                    } else {
+                        logger.error("Max retries exceeded for {}/{}. Giving up.", year, month);
+                        return null;
+                    }
+                } else if (e.getStatusCode() == HttpStatus.NOT_FOUND) {
+                    logger.info("No games found for {}/{} for user: {}", year, month, username);
+                    return null;
+                } else {
+                    logger.error("HTTP error fetching games for {}/{}: {} - {}",
+                        year, month, e.getStatusCode(), e.getMessage());
+                    return null;
+                }
+            } catch (Exception e) {
+                logger.error("Error fetching games for {}/{}: {}", year, month, e.getMessage());
+                return null;
+            }
+        }
+
+        return null;
     }
 }

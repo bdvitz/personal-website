@@ -1,0 +1,14 @@
+# Local development configuration template
+# Copy this file to application-local.properties and fill in your actual values
+# NOTE: application-local.properties is gitignored and will NOT be committed
+
+# Database Configuration (Railway PostgreSQL or local)
+spring.datasource.url=jdbc:postgresql://your-host:port/your-database
+spring.datasource.username=your-username
+spring.datasource.password=your-password
+
+# CORS for local development
+cors.allowed.origins=http://localhost:3000,http://localhost:3001
+
+# Chess.com username
+chess.username=your-chess-username

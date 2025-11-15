@@ -5,7 +5,8 @@ import { Trophy, TrendingUp, RefreshCw, Target, Zap, Clock } from 'lucide-react'
 import RatingChart from '@/components/RatingChart'
 import StatsCard from '@/components/StatsCard'
 import WinLossChart from '@/components/WinLossChart'
-import { getChessStats, refreshChessStats, getRatingsOverTime } from '@/lib/api'
+import HistoricalDataImport from '@/components/HistoricalDataImport'
+import { getChessStats, refreshChessStats, getRatingsOverTime, getRatingsByDateRange } from '@/lib/api'
 
 interface ChessStats {
   username: string
@@ -26,16 +27,51 @@ export default function ChessPage() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [days, setDays] = useState(30)
+  const [timeOption, setTimeOption] = useState('30') // '7', '30', '90', '365', 'all', 'custom'
+  const [customStartDate, setCustomStartDate] = useState('')
+  const [customEndDate, setCustomEndDate] = useState('')
+
+  // Rating visibility toggles
+  const [showRapid, setShowRapid] = useState(true)
+  const [showBlitz, setShowBlitz] = useState(true)
+  const [showBullet, setShowBullet] = useState(true)
+  const [showPuzzle, setShowPuzzle] = useState(true)
 
   // Fetch both current stats and historical chart data
   const fetchData = async () => {
     try {
       setError(null)
-      const [statsData, ratingsData] = await Promise.all([
-        getChessStats('shia_justdoit'),
-        getRatingsOverTime('shia_justdoit', days)
-      ])
+
+      let ratingsData
+
+      // Fetch stats data
+      const statsData = await getChessStats('shia_justdoit')
+
+      // Fetch ratings based on selected time option
+      if (timeOption === 'custom') {
+        if (customStartDate && customEndDate) {
+          ratingsData = await getRatingsByDateRange('shia_justdoit', customStartDate, customEndDate)
+        } else {
+          setError('Please select both start and end dates for custom range')
+          ratingsData = await getRatingsOverTime('shia_justdoit', 30)
+        }
+      } else if (timeOption === 'all') {
+        ratingsData = await getRatingsOverTime('shia_justdoit', 10000) // Large number for "all time"
+      } else {
+        ratingsData = await getRatingsOverTime('shia_justdoit', Number(timeOption))
+      }
+
+      // Filter datasets based on visibility toggles
+      if (ratingsData && ratingsData.datasets) {
+        ratingsData.datasets = ratingsData.datasets.filter((dataset: any) => {
+          if (dataset.label === 'Rapid') return showRapid
+          if (dataset.label === 'Blitz') return showBlitz
+          if (dataset.label === 'Bullet') return showBullet
+          if (dataset.label === 'Puzzle') return showPuzzle
+          return true
+        })
+      }
+
       setStats(statsData)
       setChartData(ratingsData)
     } catch (err: any) {
@@ -59,10 +95,10 @@ export default function ChessPage() {
     }
   }
 
-  // Re-fetch data when time period changes
+  // Re-fetch data when time period or visibility toggles change
   useEffect(() => {
     fetchData()
-  }, [days])
+  }, [timeOption, customStartDate, customEndDate, showRapid, showBlitz, showBullet, showPuzzle])
 
   if (loading) {
     return (
@@ -111,28 +147,99 @@ export default function ChessPage() {
       </div>
 
       {/* Controls */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="flex items-center space-x-4">
-          <label className="text-purple-200 font-medium">Time Period:</label>
-          <select
-            value={days}
-            onChange={(e) => setDays(Number(e.target.value))}
-            className="bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200"
+      <div className="flex flex-col gap-4">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div className="flex items-center space-x-4">
+            <label className="text-purple-200 font-medium">Time Period:</label>
+            <select
+              value={timeOption}
+              onChange={(e) => setTimeOption(e.target.value)}
+              className="bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200"
+            >
+              <option value="7">Last 7 Days</option>
+              <option value="30">Last 30 Days</option>
+              <option value="90">Last 90 Days</option>
+              <option value="365">Last Year</option>
+              <option value="all">All Time</option>
+              <option value="custom">Custom Range</option>
+            </select>
+          </div>
+          <button
+            onClick={handleRefresh}
+            disabled={refreshing}
+            className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100 flex items-center space-x-2"
           >
-            <option value={7}>Last 7 Days</option>
-            <option value={30}>Last 30 Days</option>
-            <option value={90}>Last 90 Days</option>
-            <option value={365}>Last Year</option>
-          </select>
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
+          </button>
         </div>
-        <button
-          onClick={handleRefresh}
-          disabled={refreshing}
-          className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100 flex items-center space-x-2"
-        >
-          <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-          <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
-        </button>
+
+        {/* Rating Type Toggles */}
+        <div className="flex flex-wrap items-center gap-6 bg-purple-900/30 rounded-lg p-4">
+          <span className="text-purple-200 font-medium">Show Ratings:</span>
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showRapid}
+              onChange={(e) => setShowRapid(e.target.checked)}
+              className="w-4 h-4 rounded border-green-500 bg-purple-800/50 text-green-500 focus:ring-green-400 focus:ring-offset-0 cursor-pointer"
+            />
+            <span className="text-green-400 font-medium">Rapid</span>
+          </label>
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showBlitz}
+              onChange={(e) => setShowBlitz(e.target.checked)}
+              className="w-4 h-4 rounded border-blue-500 bg-purple-800/50 text-blue-500 focus:ring-blue-400 focus:ring-offset-0 cursor-pointer"
+            />
+            <span className="text-blue-400 font-medium">Blitz</span>
+          </label>
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showBullet}
+              onChange={(e) => setShowBullet(e.target.checked)}
+              className="w-4 h-4 rounded border-red-500 bg-purple-800/50 text-red-500 focus:ring-red-400 focus:ring-offset-0 cursor-pointer"
+            />
+            <span className="text-red-400 font-medium">Bullet</span>
+          </label>
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={showPuzzle}
+              onChange={(e) => setShowPuzzle(e.target.checked)}
+              className="w-4 h-4 rounded border-purple-500 bg-purple-800/50 text-purple-500 focus:ring-purple-400 focus:ring-offset-0 cursor-pointer"
+            />
+            <span className="text-purple-400 font-medium">Puzzle</span>
+          </label>
+        </div>
+
+        {/* Custom Date Range Picker */}
+        {timeOption === 'custom' && (
+          <div className="card bg-purple-900/30">
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-purple-200 font-medium mb-2">Start Date</label>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="w-full bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200"
+                />
+              </div>
+              <div>
+                <label className="block text-purple-200 font-medium mb-2">End Date</label>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="w-full bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200"
+                />
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {error && (
@@ -140,6 +247,9 @@ export default function ChessPage() {
           <p className="text-red-200">{error}</p>
         </div>
       )}
+
+      {/* Historical Data Import */}
+      <HistoricalDataImport />
 
       {/* Current Ratings */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
