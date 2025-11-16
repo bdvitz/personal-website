@@ -121,6 +121,12 @@ public class GameHistoryService {
                     continue;
                 }
 
+                // Filter: only process rated games
+                boolean isRated = game.path("rated").asBoolean(false);
+                if (!isRated) {
+                    continue;
+                }
+
                 // Extract game date from end_time (Unix timestamp)
                 long endTime = game.path("end_time").asLong(0);
                 if (endTime == 0) {
