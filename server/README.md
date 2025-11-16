@@ -48,7 +48,8 @@ chess.username=your_chess_username
 
 ```bash
 mvn clean install
-mvn spring-boot:run -Dspring-boot.run.profiles=local
+mvn spring-boot:run -Dspring-boot.run.profiles=local  # local properties only
+mvn spring-boot:run -Dspring-boot.run.profiles=local,debug  # local and debug properties, overridden by last called
 # mvn spring-boot:run
 ```
 
