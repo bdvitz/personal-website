@@ -1,12 +1,12 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Trophy, TrendingUp, RefreshCw, Target, Zap, Clock } from 'lucide-react'
+import { Trophy, TrendingUp, RefreshCw, Target, Zap, Clock, User, Search } from 'lucide-react'
 import RatingChart from '@/components/RatingChart'
 import StatsCard from '@/components/StatsCard'
 import WinLossChart from '@/components/WinLossChart'
 import HistoricalDataImport from '@/components/HistoricalDataImport'
-import { getChessStats, refreshChessStats, getRatingsOverTime, getRatingsByDateRange } from '@/lib/api'
+import { getChessStats, refreshChessStats, getRatingsOverTime, getRatingsByDateRange, fetchGuestHistory } from '@/lib/api'
 
 interface ChessStats {
   username: string
@@ -22,6 +22,8 @@ interface ChessStats {
 }
 
 export default function ChessPage() {
+  const DEFAULT_USERNAME = 'shia_justdoit'
+
   const [stats, setStats] = useState<ChessStats | null>(null)
   const [chartData, setChartData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -31,11 +33,20 @@ export default function ChessPage() {
   const [customStartDate, setCustomStartDate] = useState('')
   const [customEndDate, setCustomEndDate] = useState('')
 
+  // User mode: 'stored' for default user, 'guest' for custom lookups
+  const [userMode, setUserMode] = useState<'stored' | 'guest'>('stored')
+  const [guestUsername, setGuestUsername] = useState('')
+  const [searchUsername, setSearchUsername] = useState('')
+  const [guestLoading, setGuestLoading] = useState(false)
+
   // Rating visibility toggles
   const [showRapid, setShowRapid] = useState(true)
   const [showBlitz, setShowBlitz] = useState(true)
   const [showBullet, setShowBullet] = useState(true)
-  const [showPuzzle, setShowPuzzle] = useState(true)
+  const [showPuzzle, setShowPuzzle] = useState(false)
+
+  // Graph options
+  const [connectNulls, setConnectNulls] = useState(false)
 
   // Fetch both current stats and historical chart data
   const fetchData = async () => {
@@ -43,22 +54,50 @@ export default function ChessPage() {
       setError(null)
 
       let ratingsData
+      const username = userMode === 'stored' ? DEFAULT_USERNAME : guestUsername
 
-      // Fetch stats data
-      const statsData = await getChessStats('shia_justdoit')
+      // For stored user, fetch stats from database
+      if (userMode === 'stored') {
+        const statsData = await getChessStats(username)
+        setStats(statsData)
 
-      // Fetch ratings based on selected time option
-      if (timeOption === 'custom') {
-        if (customStartDate && customEndDate) {
-          ratingsData = await getRatingsByDateRange('shia_justdoit', customStartDate, customEndDate)
+        // Fetch ratings based on selected time option
+        if (timeOption === 'custom') {
+          if (customStartDate && customEndDate) {
+            ratingsData = await getRatingsByDateRange(username, customStartDate, customEndDate)
+          } else {
+            setError('Please select both start and end dates for custom range')
+            ratingsData = await getRatingsOverTime(username, 30)
+          }
+        } else if (timeOption === 'all') {
+          ratingsData = await getRatingsOverTime(username, 10000)
         } else {
-          setError('Please select both start and end dates for custom range')
-          ratingsData = await getRatingsOverTime('shia_justdoit', 30)
+          ratingsData = await getRatingsOverTime(username, Number(timeOption))
         }
-      } else if (timeOption === 'all') {
-        ratingsData = await getRatingsOverTime('shia_justdoit', 10000) // Large number for "all time"
       } else {
-        ratingsData = await getRatingsOverTime('shia_justdoit', Number(timeOption))
+        // For guest users, fetch on-demand without database
+        setStats(null) // Guest users don't have current stats stored
+
+        // Calculate date range based on time option
+        const endDate = new Date()
+        let startDate = new Date()
+
+        if (timeOption === 'custom' && customStartDate && customEndDate) {
+          startDate = new Date(customStartDate)
+        } else if (timeOption === 'all') {
+          startDate = new Date('2010-01-01') // Chess.com started around 2007, this should be safe
+        } else {
+          const days = Number(timeOption)
+          startDate.setDate(startDate.getDate() - days)
+        }
+
+        ratingsData = await fetchGuestHistory(
+          username,
+          startDate.getFullYear(),
+          startDate.getMonth() + 1,
+          endDate.getFullYear(),
+          endDate.getMonth() + 1
+        )
       }
 
       // Filter datasets based on visibility toggles
@@ -67,12 +106,11 @@ export default function ChessPage() {
           if (dataset.label === 'Rapid') return showRapid
           if (dataset.label === 'Blitz') return showBlitz
           if (dataset.label === 'Bullet') return showBullet
-          if (dataset.label === 'Puzzle') return showPuzzle
+          if (dataset.label === 'Puzzle') return showPuzzle && userMode === 'stored' // Puzzle only for stored users
           return true
         })
       }
 
-      setStats(statsData)
       setChartData(ratingsData)
     } catch (err: any) {
       setError(err.message || 'Failed to load chess statistics')
@@ -82,11 +120,27 @@ export default function ChessPage() {
     }
   }
 
+  // Handle guest user search
+  const handleGuestSearch = async () => {
+    if (!searchUsername.trim()) {
+      setError('Please enter a username')
+      return
+    }
+
+    setGuestUsername(searchUsername.trim())
+    setUserMode('guest')
+    setLoading(true)
+    await fetchData()
+  }
+
   // Force refresh from Chess.com API
   const handleRefresh = async () => {
     setRefreshing(true)
     try {
-      await refreshChessStats('shia_justdoit')
+      const username = userMode === 'stored' ? DEFAULT_USERNAME : guestUsername
+      if (userMode === 'stored') {
+        await refreshChessStats(username)
+      }
       await fetchData()
     } catch (err: any) {
       setError('Failed to refresh stats. Please try again.')
@@ -98,7 +152,7 @@ export default function ChessPage() {
   // Re-fetch data when time period or visibility toggles change
   useEffect(() => {
     fetchData()
-  }, [timeOption, customStartDate, customEndDate, showRapid, showBlitz, showBullet, showPuzzle])
+  }, [timeOption, customStartDate, customEndDate, showRapid, showBlitz, showBullet, showPuzzle, userMode, guestUsername])
 
   if (loading) {
     return (
@@ -142,8 +196,70 @@ export default function ChessPage() {
           Chess Statistics
         </h1>
         <p className="text-xl text-purple-200">
-          Track my Chess.com progress and ratings over time
+          {userMode === 'stored'
+            ? 'Track my Chess.com progress and ratings over time'
+            : `Viewing stats for: ${guestUsername}`}
         </p>
+      </div>
+
+      {/* User Mode Toggle */}
+      <div className="card bg-purple-900/40">
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+          <div className="flex gap-2">
+            <button
+              onClick={() => {
+                setUserMode('stored')
+                setGuestUsername('')
+                setSearchUsername('')
+              }}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all duration-200 ${
+                userMode === 'stored'
+                  ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg'
+                  : 'bg-purple-800/30 text-purple-300 hover:bg-purple-800/50'
+              }`}
+            >
+              <User className="w-4 h-4 inline mr-2" />
+              My Stats
+            </button>
+            <button
+              onClick={() => setUserMode('guest')}
+              className={`px-6 py-2 rounded-lg font-semibold transition-all duration-200 ${
+                userMode === 'guest'
+                  ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg'
+                  : 'bg-purple-800/30 text-purple-300 hover:bg-purple-800/50'
+              }`}
+            >
+              <Search className="w-4 h-4 inline mr-2" />
+              Search User
+            </button>
+          </div>
+
+          {userMode === 'guest' && (
+            <div className="flex gap-2 w-full md:w-auto">
+              <input
+                type="text"
+                placeholder="Enter Chess.com username"
+                value={searchUsername}
+                onChange={(e) => setSearchUsername(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleGuestSearch()}
+                className="flex-1 md:w-64 bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200"
+              />
+              <button
+                onClick={handleGuestSearch}
+                disabled={loading}
+                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100"
+              >
+                {loading ? 'Loading...' : 'Search'}
+              </button>
+            </div>
+          )}
+        </div>
+
+        {userMode === 'guest' && (
+          <div className="mt-4 text-sm text-purple-300 bg-purple-800/30 rounded-lg p-3">
+            <p>Note: Guest user data is fetched on-demand and may take a while to load. Data is not stored in our database.</p>
+          </div>
+        )}
       </div>
 
       {/* Controls */}
@@ -215,6 +331,20 @@ export default function ChessPage() {
           </label>
         </div>
 
+        {/* Graph Options */}
+        <div className="flex flex-wrap items-center gap-6 bg-purple-900/30 rounded-lg p-4">
+          <span className="text-purple-200 font-medium">Graph Options:</span>
+          <label className="flex items-center space-x-2 cursor-pointer">
+            <input
+              type="checkbox"
+              checked={connectNulls}
+              onChange={(e) => setConnectNulls(e.target.checked)}
+              className="w-4 h-4 rounded border-purple-500 bg-purple-800/50 text-purple-500 focus:ring-purple-400 focus:ring-offset-0 cursor-pointer"
+            />
+            <span className="text-purple-200 font-medium">Connect gaps with lines</span>
+          </label>
+        </div>
+
         {/* Custom Date Range Picker */}
         {timeOption === 'custom' && (
           <div className="card bg-purple-900/30">
@@ -248,36 +378,38 @@ export default function ChessPage() {
         </div>
       )}
 
-      {/* Historical Data Import */}
-      <HistoricalDataImport />
+      {/* Historical Data Import - Only for stored user */}
+      {userMode === 'stored' && <HistoricalDataImport />}
 
-      {/* Current Ratings */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatsCard
-          title="Rapid"
-          value={stats?.rapidRating || 'N/A'}
-          icon={Target}
-          color="green"
-        />
-        <StatsCard
-          title="Blitz"
-          value={stats?.blitzRating || 'N/A'}
-          icon={Zap}
-          color="blue"
-        />
-        <StatsCard
-          title="Bullet"
-          value={stats?.bulletRating || 'N/A'}
-          icon={Clock}
-          color="red"
-        />
-        <StatsCard
-          title="Puzzle"
-          value={stats?.puzzleRating || 'N/A'}
-          icon={Trophy}
-          color="purple"
-        />
-      </div>
+      {/* Current Ratings - Only for stored user */}
+      {userMode === 'stored' && stats && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <StatsCard
+            title="Rapid"
+            value={stats?.rapidRating || 'N/A'}
+            icon={Target}
+            color="green"
+          />
+          <StatsCard
+            title="Blitz"
+            value={stats?.blitzRating || 'N/A'}
+            icon={Zap}
+            color="blue"
+          />
+          <StatsCard
+            title="Bullet"
+            value={stats?.bulletRating || 'N/A'}
+            icon={Clock}
+            color="red"
+          />
+          <StatsCard
+            title="Puzzle"
+            value={stats?.puzzleRating || 'N/A'}
+            icon={Trophy}
+            color="purple"
+          />
+        </div>
+      )}
 
       {/* Rating Chart */}
       <div className="card">
@@ -286,7 +418,7 @@ export default function ChessPage() {
           Rating Progression
         </h2>
         {chartData && chartData.labels.length > 0 ? (
-          <RatingChart data={chartData} />
+          <RatingChart data={chartData} connectNulls={connectNulls} />
         ) : (
           <div className="text-center py-12">
             <p className="text-purple-200">No historical data available yet. Data will appear after the first scheduled update.</p>
@@ -294,46 +426,48 @@ export default function ChessPage() {
         )}
       </div>
 
-      {/* Game Statistics */}
-      <div className="grid lg:grid-cols-2 gap-8">
-        {/* Win/Loss/Draw */}
-        <div className="card">
-          <h2 className="text-2xl font-bold text-white mb-6">Game Results</h2>
-          {stats && <WinLossChart stats={stats} />}
-        </div>
-
-        {/* Overall Stats */}
-        <div className="card">
-          <h2 className="text-2xl font-bold text-white mb-6">Overall Statistics</h2>
-          <div className="space-y-4">
-            <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg">
-              <span className="text-purple-200 font-medium">Total Games</span>
-              <span className="text-white font-bold text-2xl">{stats?.totalGames || 0}</span>
-            </div>
-            <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg">
-              <span className="text-purple-200 font-medium">Wins</span>
-              <span className="text-green-400 font-bold text-2xl">{stats?.wins || 0}</span>
-            </div>
-            <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg">
-              <span className="text-purple-200 font-medium">Losses</span>
-              <span className="text-red-400 font-bold text-2xl">{stats?.losses || 0}</span>
-            </div>
-            <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg">
-              <span className="text-purple-200 font-medium">Draws</span>
-              <span className="text-blue-400 font-bold text-2xl">{stats?.draws || 0}</span>
-            </div>
-            <div className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg border border-purple-400/30">
-              <span className="text-white font-semibold">Win Rate</span>
-              <span className="text-white font-bold text-2xl">{winRate}%</span>
-            </div>
+      {/* Game Statistics - Only for stored user */}
+      {userMode === 'stored' && stats && (
+        <div className="grid lg:grid-cols-2 gap-8">
+          {/* Win/Loss/Draw */}
+          <div className="card">
+            <h2 className="text-2xl font-bold text-white mb-6">Game Results</h2>
+            <WinLossChart stats={stats} />
           </div>
-          {stats?.lastUpdated && (
-            <p className="text-purple-300 text-sm mt-6 text-center">
-              Last updated: {new Date(stats.lastUpdated).toLocaleString()}
-            </p>
-          )}
+
+          {/* Overall Stats */}
+          <div className="card">
+            <h2 className="text-2xl font-bold text-white mb-6">Overall Statistics</h2>
+            <div className="space-y-4">
+              <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg">
+                <span className="text-purple-200 font-medium">Total Games</span>
+                <span className="text-white font-bold text-2xl">{stats?.totalGames || 0}</span>
+              </div>
+              <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg">
+                <span className="text-purple-200 font-medium">Wins</span>
+                <span className="text-green-400 font-bold text-2xl">{stats?.wins || 0}</span>
+              </div>
+              <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg">
+                <span className="text-purple-200 font-medium">Losses</span>
+                <span className="text-red-400 font-bold text-2xl">{stats?.losses || 0}</span>
+              </div>
+              <div className="flex justify-between items-center p-4 bg-white/5 rounded-lg">
+                <span className="text-purple-200 font-medium">Draws</span>
+                <span className="text-blue-400 font-bold text-2xl">{stats?.draws || 0}</span>
+              </div>
+              <div className="flex justify-between items-center p-4 bg-gradient-to-r from-purple-500/20 to-pink-500/20 rounded-lg border border-purple-400/30">
+                <span className="text-white font-semibold">Win Rate</span>
+                <span className="text-white font-bold text-2xl">{winRate}%</span>
+              </div>
+            </div>
+            {stats?.lastUpdated && (
+              <p className="text-purple-300 text-sm mt-6 text-center">
+                Last updated: {new Date(stats.lastUpdated).toLocaleString()}
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      )}
     </div>
   )
 }

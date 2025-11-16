@@ -178,6 +178,32 @@ public class ChessStatsController {
     }
 
     /**
+     * Fetch guest user historical data without storing in database
+     * GET /api/chess/stats/guest-history?username=example&startYear=2020&startMonth=1&endYear=2025&endMonth=11
+     */
+    @GetMapping("/guest-history")
+    public ResponseEntity<?> fetchGuestHistory(
+            @RequestParam String username,
+            @RequestParam(defaultValue = "2020") int startYear,
+            @RequestParam(defaultValue = "1") int startMonth,
+            @RequestParam(required = false) Integer endYear,
+            @RequestParam(required = false) Integer endMonth) {
+        try {
+            logger.info("Fetching guest history for user: {} from {}/{} to {}/{}",
+                    username, startYear, startMonth, endYear, endMonth);
+
+            Map<String, Object> result = gameHistoryService.fetchGuestUserHistory(
+                    username, startYear, startMonth, endYear, endMonth);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            logger.error("Error fetching guest history", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage(), "status", "failed"));
+        }
+    }
+
+    /**
      * Health check endpoint
      * GET /api/chess/stats/health
      */

@@ -234,6 +234,200 @@ public class GameHistoryService {
     }
 
     /**
+     * Fetch historical game data for a guest user without storing in database
+     * @param username Chess.com username
+     * @param startYear Starting year
+     * @param startMonth Starting month
+     * @param endYear Ending year (null = current year)
+     * @param endMonth Ending month (null = current month)
+     * @return Map with chart data and statistics
+     */
+    public Map<String, Object> fetchGuestUserHistory(String username, int startYear, int startMonth, Integer endYear, Integer endMonth) {
+        logger.info("Fetching guest user history for: {} from {}/{} to {}/{}",
+                username, startYear, startMonth, endYear, endMonth);
+
+        LocalDate now = LocalDate.now();
+        int currentYear = endYear != null ? endYear : now.getYear();
+        int currentMonth = endMonth != null ? endMonth : now.getMonthValue();
+
+        // Track ratings by date without saving to database
+        Map<LocalDate, DailyRatingData> dailyRatingsMap = new TreeMap<>();
+        int totalGamesProcessed = 0;
+
+        // Iterate through each month from start date to end date
+        for (int year = startYear; year <= currentYear; year++) {
+            int monthStart = (year == startYear) ? startMonth : 1;
+            int monthEnd = (year == currentYear) ? currentMonth : 12;
+
+            for (int month = monthStart; month <= monthEnd; month++) {
+                try {
+                    // Add a small delay to be respectful to Chess.com API
+                    if (totalGamesProcessed > 0) {
+                        Thread.sleep(300); // 300ms delay between requests
+                    }
+
+                    JsonNode monthData = chessComApiService.fetchMonthlyGames(username, year, month);
+
+                    if (monthData != null) {
+                        int gamesProcessed = processMonthlyGamesForGuest(username, monthData, dailyRatingsMap);
+                        totalGamesProcessed += gamesProcessed;
+                        logger.info("Processed {}/{}: {} games for guest user", year, month, gamesProcessed);
+                    }
+                } catch (InterruptedException e) {
+                    logger.error("Fetch interrupted", e);
+                    Thread.currentThread().interrupt();
+                    break;
+                } catch (Exception e) {
+                    logger.error("Error processing {}/{}: {}", year, month, e.getMessage());
+                }
+            }
+        }
+
+        // Format the data for chart display
+        Map<String, Object> result = formatGuestChartData(dailyRatingsMap);
+        result.put("gamesProcessed", totalGamesProcessed);
+        result.put("status", "completed");
+
+        logger.info("Guest user fetch completed. Games: {}", totalGamesProcessed);
+
+        return result;
+    }
+
+    /**
+     * Process games from a single month for guest users (no database storage)
+     */
+    private int processMonthlyGamesForGuest(String username, JsonNode monthData, Map<LocalDate, DailyRatingData> dailyRatingsMap) {
+        JsonNode gamesArray = monthData.path("games");
+
+        if (gamesArray.isMissingNode() || !gamesArray.isArray()) {
+            return 0;
+        }
+
+        int gamesProcessed = 0;
+
+        for (JsonNode game : gamesArray) {
+            try {
+                // Filter: only process "chess" rules
+                String rules = game.path("rules").asText("");
+                if (!"chess".equals(rules)) {
+                    continue;
+                }
+
+                // Filter: only process rated games
+                boolean isRated = game.path("rated").asBoolean(false);
+                if (!isRated) {
+                    continue;
+                }
+
+                // Extract game date from end_time
+                long endTime = game.path("end_time").asLong(0);
+                if (endTime == 0) {
+                    continue;
+                }
+
+                LocalDate gameDate = Instant.ofEpochSecond(endTime)
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate();
+
+                // Extract time_class
+                String timeClass = game.path("time_class").asText("");
+
+                // Extract player rating
+                Integer rating = extractPlayerRating(game, username);
+
+                if (rating != null && !timeClass.isEmpty()) {
+                    DailyRatingData dailyData = dailyRatingsMap.computeIfAbsent(
+                            gameDate, k -> new DailyRatingData());
+
+                    switch (timeClass) {
+                        case "blitz":
+                            dailyData.blitzRating = rating;
+                            break;
+                        case "rapid":
+                            dailyData.rapidRating = rating;
+                            break;
+                        case "bullet":
+                            dailyData.bulletRating = rating;
+                            break;
+                    }
+
+                    gamesProcessed++;
+                }
+
+            } catch (Exception e) {
+                logger.warn("Error processing individual game: {}", e.getMessage());
+            }
+        }
+
+        return gamesProcessed;
+    }
+
+    /**
+     * Format guest user data for chart display
+     */
+    private Map<String, Object> formatGuestChartData(Map<LocalDate, DailyRatingData> dailyRatingsMap) {
+        Map<String, Object> chartData = new HashMap<>();
+
+        if (dailyRatingsMap.isEmpty()) {
+            chartData.put("labels", new ArrayList<>());
+            chartData.put("datasets", new ArrayList<>());
+            return chartData;
+        }
+
+        // Get date range
+        LocalDate startDate = dailyRatingsMap.keySet().iterator().next();
+        LocalDate endDate = dailyRatingsMap.keySet().stream()
+                .reduce((first, second) -> second).orElse(startDate);
+
+        // Generate all dates in range
+        List<String> labels = new ArrayList<>();
+        List<Integer> rapidRatings = new ArrayList<>();
+        List<Integer> blitzRatings = new ArrayList<>();
+        List<Integer> bulletRatings = new ArrayList<>();
+
+        LocalDate currentDate = startDate;
+        while (!currentDate.isAfter(endDate)) {
+            labels.add(currentDate.toString());
+
+            DailyRatingData data = dailyRatingsMap.get(currentDate);
+            if (data != null) {
+                rapidRatings.add(data.rapidRating);
+                blitzRatings.add(data.blitzRating);
+                bulletRatings.add(data.bulletRating);
+            } else {
+                rapidRatings.add(null);
+                blitzRatings.add(null);
+                bulletRatings.add(null);
+            }
+
+            currentDate = currentDate.plusDays(1);
+        }
+
+        // Create datasets
+        List<Map<String, Object>> datasets = new ArrayList<>();
+        datasets.add(createDataset("Rapid", rapidRatings, "#22c55e"));
+        datasets.add(createDataset("Blitz", blitzRatings, "#3b82f6"));
+        datasets.add(createDataset("Bullet", bulletRatings, "#ef4444"));
+
+        chartData.put("labels", labels);
+        chartData.put("datasets", datasets);
+
+        return chartData;
+    }
+
+    /**
+     * Helper method to create dataset for charts
+     */
+    private Map<String, Object> createDataset(String label, List<Integer> data, String color) {
+        Map<String, Object> dataset = new HashMap<>();
+        dataset.put("label", label);
+        dataset.put("data", data);
+        dataset.put("borderColor", color);
+        dataset.put("backgroundColor", color + "33");
+        return dataset;
+    }
+
+    /**
      * Helper class to track ratings for a single day
      */
     private static class DailyRatingData {

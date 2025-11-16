@@ -90,4 +90,32 @@ export const importHistoricalData = async (
   }
 }
 
+// Fetch guest user historical data without storing in database
+export const fetchGuestHistory = async (
+  username: string,
+  startYear: number,
+  startMonth: number,
+  endYear?: number,
+  endMonth?: number
+) => {
+  try {
+    const params: any = {
+      username,
+      startYear,
+      startMonth
+    }
+
+    if (endYear !== undefined) params.endYear = endYear
+    if (endMonth !== undefined) params.endMonth = endMonth
+
+    const response = await apiClient.get(`/api/chess/stats/guest-history`, {
+      params,
+      timeout: 600000, // 10 minute timeout for long fetches
+    })
+    return response.data
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || 'Failed to fetch guest history')
+  }
+}
+
 export default apiClient
