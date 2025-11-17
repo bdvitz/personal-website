@@ -493,7 +493,7 @@ export default function ChessPage() {
               <li>Click "Retrieve Historical Data" to fetch chess history</li>
               <li>Data will be cached so you can switch between smaller time ranges without re-fetching</li>
             </ul>
-            <p className="text-xs text-purple-200 italic">Note: This takes about 4 seconds per year of data to respect Chess.com's API rate limiting</p>
+            <p className="text-xs text-purple-200 italic">Note: This takes about 5 to 10 seconds per year of data to respect Chess.com's API rate limiting</p>
           </div>
         )}
 

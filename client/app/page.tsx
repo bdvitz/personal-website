@@ -9,7 +9,7 @@ export default function Home() {
           Bryan Vitz
         </h1>
         <p className="text-2xl text-purple-200 max-w-3xl mx-auto leading-relaxed">
-          Explore my coding challenges, chess improvements, and other hobbies
+          Explore my coding challenges, chess improvements, and hobbies
         </p>
       </div>
 

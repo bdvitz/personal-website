@@ -22,11 +22,14 @@ public class ChessStatsScheduler {
     /**
      * Scheduled task to fetch chess stats daily at 3 AM UTC
      * Cron expression: "0 0 3 * * *" = Every day at 03:00:00
+     *
+     * COMMENTED OUT: Not needed - stats are refreshed manually via UI
+     * Uncomment the @Scheduled annotation below to re-enable automatic daily updates
      */
-    @Scheduled(cron = "0 0 3 * * *")
+    // @Scheduled(cron = "0 0 3 * * *")
     public void fetchDailyChessStats() {
         logger.info("Starting scheduled chess stats fetch for user: {}", chessUsername);
-        
+
         try {
             chessStatsService.fetchAndStoreStats(chessUsername);
             logger.info("Successfully completed scheduled chess stats fetch");
