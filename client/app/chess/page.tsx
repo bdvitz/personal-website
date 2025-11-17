@@ -735,7 +735,7 @@ export default function ChessPage() {
             color="red"
           />
           <StatsCard
-            title="Puzzle"
+            title="Highest Puzzle Rating"
             value={stats?.puzzleRating || 'N/A'}
             icon={Trophy}
             color="purple"
