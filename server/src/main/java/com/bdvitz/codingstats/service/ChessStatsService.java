@@ -38,19 +38,37 @@ public class ChessStatsService {
     }
     
     /**
+     * Fetch live stats from Chess.com without storing in database
+     * Used for guest users
+     */
+    public Map<String, Object> fetchLiveStats(String username) {
+        logger.info("Fetching live stats (no database) for user: {}", username);
+
+        // Fetch stats from Chess.com API
+        Map<String, Object> apiStats = chessComApiService.fetchChessStats(username);
+
+        // Add username to response
+        apiStats.put("username", username);
+        apiStats.put("lastUpdated", LocalDateTime.now().toString());
+
+        logger.info("Successfully fetched live stats for user: {}", username);
+        return apiStats;
+    }
+
+    /**
      * Fetch and store chess statistics from Chess.com
      */
     @Transactional
     public ChessStat fetchAndStoreStats(String username) {
         logger.info("Fetching stats for user: {}", username);
-        
+
         // Fetch stats from Chess.com API
         Map<String, Object> apiStats = chessComApiService.fetchChessStats(username);
-        
+
         // Find or create ChessStat entity
         ChessStat chessStat = chessStatRepository.findByUsername(username)
                 .orElse(new ChessStat(username));
-        
+
         // Update stats
         chessStat.setRapidRating((Integer) apiStats.get("rapidRating"));
         chessStat.setBlitzRating((Integer) apiStats.get("blitzRating"));
@@ -61,13 +79,13 @@ public class ChessStatsService {
         chessStat.setLosses((Integer) apiStats.get("losses"));
         chessStat.setDraws((Integer) apiStats.get("draws"));
         chessStat.setLastUpdated(LocalDateTime.now());
-        
+
         // Save to database
         ChessStat saved = chessStatRepository.save(chessStat);
-        
+
         // Also create daily rating snapshot
         saveDailyRating(username, saved);
-        
+
         logger.info("Successfully updated stats for user: {}", username);
         return saved;
     }

@@ -178,6 +178,23 @@ public class ChessStatsController {
     }
 
     /**
+     * Fetch current stats for guest user without storing in database
+     * GET /api/chess/stats/guest-current?username=example
+     */
+    @GetMapping("/guest-current")
+    public ResponseEntity<?> fetchGuestCurrentStats(@RequestParam String username) {
+        try {
+            logger.info("Fetching live stats for guest user: {}", username);
+            Map<String, Object> stats = chessStatsService.fetchLiveStats(username);
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            logger.error("Error fetching guest current stats", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    /**
      * Fetch guest user historical data without storing in database
      * GET /api/chess/stats/guest-history?username=example&startYear=2020&startMonth=1&endYear=2025&endMonth=11
      */

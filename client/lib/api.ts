@@ -103,6 +103,16 @@ export const verifyChessComUser = async (username: string) => {
   }
 }
 
+// Fetch current stats for guest user without storing in database
+export const getGuestStats = async (username: string) => {
+  try {
+    const response = await apiClient.get(`/api/chess/stats/guest-current`, { params: { username } })
+    return response.data
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || 'Failed to fetch guest statistics')
+  }
+}
+
 // Fetch guest user historical data without storing in database
 export const fetchGuestHistory = async (
   username: string,

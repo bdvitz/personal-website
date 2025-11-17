@@ -40,9 +40,9 @@ The frontend uses `.env` files:
 2. **Edit `application-local.properties` with your Railway credentials:**
    ```properties
    # Railway PostgreSQL Database
-   spring.datasource.url=jdbc:postgresql://switchback.proxy.rlwy.net:46670/railway
+   spring.datasource.url=jdbc:postgresql://your-railway-host:port/railway
    spring.datasource.username=postgres
-   spring.datasource.password=uDEqIUNymTgMZDnFfnCujOTfEXTKQEiB
+   spring.datasource.password=YOUR_RAILWAY_PASSWORD_HERE
 
    # CORS for local development
    cors.allowed.origins=http://localhost:3000,http://localhost:3001

@@ -24,7 +24,7 @@ cp application-local.properties.example application-local.properties
 
 Edit `application-local.properties`:
 ```properties
-spring.datasource.url=jdbc:postgresql://switchback.proxy.rlwy.net:46670/railway
+spring.datasource.url=jdbc:postgresql://your-railway-host:port/railway
 spring.datasource.username=postgres
 spring.datasource.password=YOUR_RAILWAY_PASSWORD_HERE
 cors.allowed.origins=http://localhost:3000

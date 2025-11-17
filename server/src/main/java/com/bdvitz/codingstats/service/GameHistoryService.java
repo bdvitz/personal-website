@@ -175,17 +175,15 @@ public class GameHistoryService {
      * Process games from a single month and extract ratings by date
      * @param username Chess.com username (case-insensitive match)
      * @param monthData JsonNode containing games array
+     * @param dailyRatingsMap Map to store daily ratings (passed in for flexibility)
      * @return Number of games processed
      */
-    private int processMonthlyGames(String username, JsonNode monthData) {
+    private int processMonthlyGamesCore(String username, JsonNode monthData, Map<LocalDate, DailyRatingData> dailyRatingsMap) {
         JsonNode gamesArray = monthData.path("games");
 
         if (gamesArray.isMissingNode() || !gamesArray.isArray()) {
             return 0;
         }
-
-        // Track the last rating seen for each game type on each date
-        Map<LocalDate, DailyRatingData> dailyRatingsMap = new HashMap<>();
 
         int gamesProcessed = 0;
 
@@ -244,6 +242,21 @@ public class GameHistoryService {
                 logger.warn("Error processing individual game: {}", e.getMessage());
             }
         }
+
+        return gamesProcessed;
+    }
+
+    /**
+     * Process games from a single month and save to database
+     * @param username Chess.com username (case-insensitive match)
+     * @param monthData JsonNode containing games array
+     * @return Number of games processed
+     */
+    private int processMonthlyGames(String username, JsonNode monthData) {
+        // Track the last rating seen for each game type on each date
+        Map<LocalDate, DailyRatingData> dailyRatingsMap = new HashMap<>();
+
+        int gamesProcessed = processMonthlyGamesCore(username, monthData, dailyRatingsMap);
 
         // Save or update daily ratings in database
         saveDailyRatings(username, dailyRatingsMap);
@@ -386,71 +399,10 @@ public class GameHistoryService {
 
     /**
      * Process games from a single month for guest users (no database storage)
+     * This is now just a wrapper around processMonthlyGamesCore
      */
     private int processMonthlyGamesForGuest(String username, JsonNode monthData, Map<LocalDate, DailyRatingData> dailyRatingsMap) {
-        JsonNode gamesArray = monthData.path("games");
-
-        if (gamesArray.isMissingNode() || !gamesArray.isArray()) {
-            return 0;
-        }
-
-        int gamesProcessed = 0;
-
-        for (JsonNode game : gamesArray) {
-            try {
-                // Filter: only process "chess" rules
-                String rules = game.path("rules").asText("");
-                if (!"chess".equals(rules)) {
-                    continue;
-                }
-
-                // Filter: only process rated games
-                boolean isRated = game.path("rated").asBoolean(false);
-                if (!isRated) {
-                    continue;
-                }
-
-                // Extract game date from end_time
-                long endTime = game.path("end_time").asLong(0);
-                if (endTime == 0) {
-                    continue;
-                }
-
-                LocalDate gameDate = Instant.ofEpochSecond(endTime)
-                        .atZone(ZoneId.systemDefault())
-                        .toLocalDate();
-
-                // Extract time_class
-                String timeClass = game.path("time_class").asText("");
-
-                // Extract player rating
-                Integer rating = extractPlayerRating(game, username);
-
-                if (rating != null && !timeClass.isEmpty()) {
-                    DailyRatingData dailyData = dailyRatingsMap.computeIfAbsent(
-                            gameDate, k -> new DailyRatingData());
-
-                    switch (timeClass) {
-                        case "blitz":
-                            dailyData.blitzRating = rating;
-                            break;
-                        case "rapid":
-                            dailyData.rapidRating = rating;
-                            break;
-                        case "bullet":
-                            dailyData.bulletRating = rating;
-                            break;
-                    }
-
-                    gamesProcessed++;
-                }
-
-            } catch (Exception e) {
-                logger.warn("Error processing individual game: {}", e.getMessage());
-            }
-        }
-
-        return gamesProcessed;
+        return processMonthlyGamesCore(username, monthData, dailyRatingsMap);
     }
 
     /**

@@ -117,9 +117,9 @@ cp application-local.properties.example application-local.properties
 **application-local.properties** (NOT committed to Git):
 ```properties
 # Railway PostgreSQL Database
-spring.datasource.url=jdbc:postgresql://switchback.proxy.rlwy.net:46670/railway
+spring.datasource.url=jdbc:postgresql://your-railway-host:port/railway
 spring.datasource.username=postgres
-spring.datasource.password=your-railway-password
+spring.datasource.password=YOUR_RAILWAY_PASSWORD_HERE
 cors.allowed.origins=http://localhost:3000,http://localhost:3001
 chess.username=shia_justdoit
 ```

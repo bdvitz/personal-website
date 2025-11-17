@@ -5,7 +5,7 @@ import { Trophy, TrendingUp, RefreshCw, Target, Zap, Clock, User, Search, Databa
 import RatingChart from '@/components/RatingChart'
 import StatsCard from '@/components/StatsCard'
 import WinLossChart from '@/components/WinLossChart'
-import { getChessStats, refreshChessStats, getRatingsOverTime, getRatingsByDateRange, fetchGuestHistory, importHistoricalData, verifyChessComUser } from '@/lib/api'
+import { getChessStats, getGuestStats, refreshChessStats, getRatingsOverTime, getRatingsByDateRange, fetchGuestHistory, importHistoricalData, verifyChessComUser } from '@/lib/api'
 
 interface ChessStats {
   username: string
@@ -62,6 +62,36 @@ export default function ChessPage() {
 
   // Graph options
   const [connectNulls, setConnectNulls] = useState(false)
+
+  // Helper function to calculate date range based on time option
+  const calculateDateRange = (option: string, customStart?: { year: number; month: number }, customEnd?: { year: number; month: number }): { startDate: Date; endDate: Date } => {
+    let endDate = new Date()
+    let startDate = new Date()
+
+    if (option === 'custom' && customStart && customEnd) {
+      startDate = new Date(customStart.year, customStart.month - 1, 1)
+      endDate = new Date(customEnd.year, customEnd.month, 0) // Last day of month
+    } else if (option === 'all') {
+      // Use user's join date if available, otherwise default to 2010
+      startDate = userJoinDate ? new Date(userJoinDate) : new Date('2010-01-01')
+    } else {
+      const days = Number(option)
+      startDate.setDate(startDate.getDate() - days)
+    }
+
+    return { startDate, endDate }
+  }
+
+  // Helper function to filter datasets based on visibility toggles
+  const filterDatasets = (datasets: any[]): any[] => {
+    return datasets.filter((dataset: any) => {
+      if (dataset.label === 'Rapid') return showRapid
+      if (dataset.label === 'Blitz') return showBlitz
+      if (dataset.label === 'Bullet') return showBullet
+      if (dataset.label === 'Puzzle') return showPuzzle && userMode === 'stored' // Puzzle only for stored users
+      return true
+    })
+  }
 
   // Helper function to format chart data from cached data
   const formatChartDataFromCache = (startDate: Date, endDate: Date) => {
@@ -126,19 +156,11 @@ export default function ChessPage() {
         // For guest users, use cached data if available and not forcing refresh
 
         // Calculate date range based on time option
-        let endDate = new Date()
-        let startDate = new Date()
-
-        if (timeOption === 'custom') {
-          startDate = new Date(customStartYear, customStartMonth - 1, 1)
-          endDate = new Date(customEndYear, customEndMonth, 0) // Last day of month
-        } else if (timeOption === 'all') {
-          // Use user's join date if available, otherwise default to 2010
-          startDate = userJoinDate ? new Date(userJoinDate) : new Date('2010-01-01')
-        } else {
-          const days = Number(timeOption)
-          startDate.setDate(startDate.getDate() - days)
-        }
+        const { startDate, endDate } = calculateDateRange(
+          timeOption,
+          { year: customStartYear, month: customStartMonth },
+          { year: customEndYear, month: customEndMonth }
+        )
 
         // Check if we can use cached data
         if (!forceRefresh && cachedData && cachedData.username === username && cachedData.fetchedRange) {
@@ -196,13 +218,7 @@ export default function ChessPage() {
 
       // Filter datasets based on visibility toggles
       if (ratingsData && ratingsData.datasets) {
-        ratingsData.datasets = ratingsData.datasets.filter((dataset: any) => {
-          if (dataset.label === 'Rapid') return showRapid
-          if (dataset.label === 'Blitz') return showBlitz
-          if (dataset.label === 'Bullet') return showBullet
-          if (dataset.label === 'Puzzle') return showPuzzle && userMode === 'stored' // Puzzle only for stored users
-          return true
-        })
+        ratingsData.datasets = filterDatasets(ratingsData.datasets)
       }
 
       setChartData(ratingsData)
@@ -249,9 +265,9 @@ export default function ChessPage() {
         console.log('User joined Chess.com on:', joinDate.toLocaleDateString())
       }
 
-      // Fetch current stats for the guest user
+      // Fetch current stats for the guest user (without storing in database)
       try {
-        const statsData = await getChessStats(searchUsername.trim())
+        const statsData = await getGuestStats(searchUsername.trim())
         setStats(statsData)
       } catch (err: any) {
         console.error('Could not fetch guest stats:', err)
@@ -271,7 +287,10 @@ export default function ChessPage() {
     setError(null)
     try {
       const username = userMode === 'stored' ? DEFAULT_USERNAME : guestUsername
-      const statsData = await refreshChessStats(username)
+      // Use different endpoints based on user mode
+      const statsData = userMode === 'stored'
+        ? await refreshChessStats(username)  // Stores in database
+        : await getGuestStats(username)      // Doesn't store in database
       setStats(statsData)
     } catch (err: any) {
       setError(err.message || 'Failed to refresh stats. Please try again.')
@@ -336,29 +355,16 @@ export default function ChessPage() {
     } else if (userMode === 'guest' && guestUsername && cachedData && cachedData.username === guestUsername) {
       // Guest users: only update chart from cache if data is already loaded
       // Don't fetch new data - just re-render the existing cache with new filters
-      let endDate = new Date()
-      let startDate = new Date()
-
-      if (timeOption === 'custom') {
-        startDate = new Date(customStartYear, customStartMonth - 1, 1)
-        endDate = new Date(customEndYear, customEndMonth, 0) // Last day of month
-      } else if (timeOption === 'all') {
-        // Use user's join date if available, otherwise default to 2010
-        startDate = userJoinDate ? new Date(userJoinDate) : new Date('2010-01-01')
-      } else {
-        const days = Number(timeOption)
-        startDate.setDate(startDate.getDate() - days)
-      }
+      const { startDate, endDate } = calculateDateRange(
+        timeOption,
+        { year: customStartYear, month: customStartMonth },
+        { year: customEndYear, month: customEndMonth }
+      )
 
       const chartData = formatChartDataFromCache(startDate, endDate)
       if (chartData) {
         // Filter datasets based on visibility toggles
-        chartData.datasets = chartData.datasets.filter((dataset: any) => {
-          if (dataset.label === 'Rapid') return showRapid
-          if (dataset.label === 'Blitz') return showBlitz
-          if (dataset.label === 'Bullet') return showBullet
-          return true
-        })
+        chartData.datasets = filterDatasets(chartData.datasets)
         setChartData(chartData)
         // Chart username should remain the same when updating from cache (already set from initial fetch)
       }
