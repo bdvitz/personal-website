@@ -48,7 +48,7 @@ The frontend uses `.env` files:
    cors.allowed.origins=http://localhost:3000,http://localhost:3001
 
    # Chess.com username
-   chess.username=shia_justdoit
+   chess.username=YOUR_USERNAME
    ```
 
 3. **Run the backend with the local profile:**
