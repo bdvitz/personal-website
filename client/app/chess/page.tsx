@@ -452,7 +452,7 @@ export default function ChessPage() {
 
         {userMode === 'guest' && (
           <div className="mt-4 text-sm text-purple-300 bg-purple-800/30 rounded-lg p-3">
-            <p><strong>How it works:</strong> Select your desired time range below, then click "Retrieve Data" to fetch chess history. Data will be cached so you can switch between smaller time ranges without re-fetching.</p>
+            <p><strong>How it works:</strong> First, Verify your Chess.com username. Second, select your desired time range below, then click "Retrieve Historical Data" to fetch chess history. Data will be cached so you can switch between smaller time ranges without re-fetching.</p>
           </div>
         )}
 
@@ -480,7 +480,7 @@ export default function ChessPage() {
         )}
       </div>
 
-      {/* Info Card - For all users */}
+      {/* Info Card - For all users
       <div className="card bg-blue-900/20 border border-blue-500/30">
         <div className="flex items-start space-x-3">
           <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
@@ -497,7 +497,7 @@ export default function ChessPage() {
             </p>
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Controls */}
       <div className="flex flex-col gap-4">
@@ -543,7 +543,7 @@ export default function ChessPage() {
 
         {/* Rating Type Toggles */}
         <div className="flex flex-wrap items-center gap-6 bg-purple-900/30 rounded-lg p-4">
-          <span className="text-purple-200 font-medium">Show Ratings:</span>
+          <span className="text-purple-200 font-medium">Graph Options:</span>
           <label className="flex items-center space-x-2 cursor-pointer">
             <input
               type="checkbox"
@@ -580,11 +580,6 @@ export default function ChessPage() {
             />
             <span className="text-purple-400 font-medium">Puzzle</span>
           </label>
-        </div>
-
-        {/* Graph Options */}
-        <div className="flex flex-wrap items-center gap-6 bg-purple-900/30 rounded-lg p-4">
-          <span className="text-purple-200 font-medium">Graph Options:</span>
           <label className="flex items-center space-x-2 cursor-pointer">
             <input
               type="checkbox"
