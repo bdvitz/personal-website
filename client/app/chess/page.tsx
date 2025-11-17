@@ -45,6 +45,7 @@ export default function ChessPage() {
   const [verifying, setVerifying] = useState(false)
   const [userVerified, setUserVerified] = useState(false)
   const [userJoinDate, setUserJoinDate] = useState<Date | null>(null) // Store user's Chess.com join date
+  const [chartUsername, setChartUsername] = useState<string>('') // Track which username the chart data belongs to
 
   // Client-side cache for fetched data
   const [cachedData, setCachedData] = useState<{
@@ -100,7 +101,7 @@ export default function ChessPage() {
     }
   }
 
-  // Fetch both current stats and historical chart data
+  // Fetch historical chart data only (stats are fetched separately)
   const fetchData = async (forceRefresh = false) => {
     try {
       setError(null)
@@ -108,11 +109,8 @@ export default function ChessPage() {
       let ratingsData: any
       const username = userMode === 'stored' ? DEFAULT_USERNAME : guestUsername
 
-      // For stored user, fetch stats from database
+      // For stored user, fetch historical ratings from database
       if (userMode === 'stored') {
-        const statsData = await getChessStats(username)
-        setStats(statsData)
-
         // Fetch ratings based on selected time option
         if (timeOption === 'custom') {
           // Convert year/month to date strings for the API
@@ -126,7 +124,6 @@ export default function ChessPage() {
         }
       } else {
         // For guest users, use cached data if available and not forcing refresh
-        setStats(null) // Guest users don't have current stats stored
 
         // Calculate date range based on time option
         let endDate = new Date()
@@ -209,6 +206,8 @@ export default function ChessPage() {
       }
 
       setChartData(ratingsData)
+      // Set the chart username to track which user's data is being displayed
+      setChartUsername(username)
     } catch (err: any) {
       setError(err.message || 'Failed to load chess statistics')
       console.error('Error fetching chess data:', err)
@@ -310,6 +309,25 @@ export default function ChessPage() {
     }
   }
 
+  // Initial load: fetch stats for stored users
+  useEffect(() => {
+    if (userMode === 'stored') {
+      const loadInitialStats = async () => {
+        try {
+          const statsData = await getChessStats(DEFAULT_USERNAME)
+          setStats(statsData)
+          setLoading(false)
+        } catch (err: any) {
+          setError(err.message || 'Failed to load stats')
+          setLoading(false)
+        }
+      }
+      loadInitialStats()
+    } else {
+      setLoading(false)
+    }
+  }, []) // Run only once on mount
+
   // Re-fetch data when time period or visibility toggles change
   useEffect(() => {
     if (userMode === 'stored') {
@@ -342,6 +360,7 @@ export default function ChessPage() {
           return true
         })
         setChartData(chartData)
+        // Chart username should remain the same when updating from cache (already set from initial fetch)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -400,12 +419,21 @@ export default function ChessPage() {
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="flex gap-2">
             <button
-              onClick={() => {
+              onClick={async () => {
                 setUserMode('stored')
                 setGuestUsername('')
                 setSearchUsername('')
                 setUserVerified(false)
                 setUserJoinDate(null)
+                setChartUsername('')
+
+                // Refresh stats when switching back to stored user mode
+                try {
+                  const statsData = await getChessStats(DEFAULT_USERNAME)
+                  setStats(statsData)
+                } catch (err: any) {
+                  console.error('Failed to refresh stats:', err)
+                }
               }}
               className={`px-6 py-2 rounded-lg font-semibold transition-all duration-200 ${
                 userMode === 'stored'
@@ -452,7 +480,14 @@ export default function ChessPage() {
 
         {userMode === 'guest' && (
           <div className="mt-4 text-sm text-purple-300 bg-purple-800/30 rounded-lg p-3">
-            <p><strong>How it works:</strong> First, Verify your Chess.com username. Second, select your desired time range below, then click "Retrieve Historical Data" to fetch chess history. Data will be cached so you can switch between smaller time ranges without re-fetching.</p>
+            <p className="font-semibold mb-2">How it works:</p>
+            <ul className="list-disc list-inside space-y-1 ml-2 mb-3">
+              <li>First, verify your Chess.com username using the button above</li>
+              <li>Select your desired time range below</li>
+              <li>Click "Retrieve Historical Data" to fetch chess history</li>
+              <li>Data will be cached so you can switch between smaller time ranges without re-fetching</li>
+            </ul>
+            <p className="text-xs text-purple-200 italic">Note: This takes about 4 seconds per year of data to respect Chess.com's API rate limiting</p>
           </div>
         )}
 
@@ -571,7 +606,7 @@ export default function ChessPage() {
             />
             <span className="text-red-400 font-medium">Bullet</span>
           </label>
-          <label className="flex items-center space-x-2 cursor-pointer">
+          {/* <label className="flex items-center space-x-2 cursor-pointer">
             <input
               type="checkbox"
               checked={showPuzzle}
@@ -579,7 +614,7 @@ export default function ChessPage() {
               className="w-4 h-4 rounded border-purple-500 bg-purple-800/50 text-purple-500 focus:ring-purple-400 focus:ring-offset-0 cursor-pointer"
             />
             <span className="text-purple-400 font-medium">Puzzle</span>
-          </label>
+          </label> */}
           <label className="flex items-center space-x-2 cursor-pointer">
             <input
               type="checkbox"
@@ -712,7 +747,7 @@ export default function ChessPage() {
       <div className="card">
         <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
           <TrendingUp className="w-6 h-6 text-purple-400 mr-2" />
-          Rating Progression
+          Rating Progression for {userMode === 'stored' ? 'Bryan Vitz' : chartUsername || 'User'}
         </h2>
         {chartData && chartData.labels.length > 0 ? (
           <RatingChart data={chartData} connectNulls={connectNulls} />

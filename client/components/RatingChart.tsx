@@ -1,5 +1,6 @@
 'use client'
 
+import { memo, useMemo } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface RatingChartProps {
@@ -15,27 +16,33 @@ interface RatingChartProps {
   connectNulls?: boolean
 }
 
-export default function RatingChart({ data, connectNulls = false }: RatingChartProps) {
-  // Transform backend data to Recharts format
-  const chartData = data.labels.map((label, index) => {
-    const dataPoint: any = { date: label }
-    data.datasets.forEach(dataset => {
-      dataPoint[dataset.label] = dataset.data[index]
+const RatingChart = memo(function RatingChart({ data, connectNulls = false }: RatingChartProps) {
+  // Transform backend data to Recharts format - memoized to prevent recalculation
+  const chartData = useMemo(() => {
+    return data.labels.map((label, index) => {
+      const dataPoint: any = { date: label }
+      data.datasets.forEach(dataset => {
+        dataPoint[dataset.label] = dataset.data[index]
+      })
+      return dataPoint
     })
-    return dataPoint
-  })
+  }, [data.labels, data.datasets])
 
-  // Calculate min and max values across all datasets
-  const allValues = data.datasets.flatMap(dataset => dataset.data).filter(val => val != null)
-  const minValue = Math.min(...allValues)
-  const maxValue = Math.max(...allValues)
+  // Calculate min and max values across all datasets - memoized
+  const { yAxisMin, yAxisMax } = useMemo(() => {
+    const allValues = data.datasets.flatMap(dataset => dataset.data).filter(val => val != null)
+    const minValue = Math.min(...allValues)
+    const maxValue = Math.max(...allValues)
 
-  // Add 50 point padding above and below the actual data range
-  const yAxisMin = Math.floor(minValue - 50)
-  const yAxisMax = Math.ceil(maxValue + 50)
+    // Add 50 point padding above and below the actual data range
+    return {
+      yAxisMin: Math.floor(minValue - 50),
+      yAxisMax: Math.ceil(maxValue + 50)
+    }
+  }, [data.datasets])
 
-  // Determine date range and format accordingly
-  const getDateFormat = () => {
+  // Determine date range and format accordingly - memoized
+  const formatDate = useMemo(() => {
     if (data.labels.length === 0) return (value: string) => value
 
     const firstDate = new Date(data.labels[0])
@@ -71,9 +78,7 @@ export default function RatingChart({ data, connectNulls = false }: RatingChartP
       const year = date.getFullYear().toString().slice(-2)
       return `${month} ${day} '${year}`
     }
-  }
-
-  const formatDate = getDateFormat()
+  }, [data.labels])
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload?.length) return null
@@ -125,4 +130,6 @@ export default function RatingChart({ data, connectNulls = false }: RatingChartP
       </LineChart>
     </ResponsiveContainer>
   )
-}
+})
+
+export default RatingChart
