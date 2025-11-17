@@ -36,8 +36,8 @@ const RatingChart = memo(function RatingChart({ data, connectNulls = false }: Ra
 
     // Add 50 point padding above and below the actual data range
     return {
-      yAxisMin: Math.floor(minValue - 50),
-      yAxisMax: Math.ceil(maxValue + 50)
+      yAxisMin: Math.floor(minValue),
+      yAxisMax: Math.ceil(maxValue)
     }
   }, [data.datasets])
 
