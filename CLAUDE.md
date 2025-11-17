@@ -99,22 +99,86 @@ mvn test            # Run tests
 
 ## Environment Setup
 
-### Client (.env.local)
-```
-NEXT_PUBLIC_API_URL=http://localhost:8080
+### Overview
+This project uses environment variables to keep sensitive data (like database credentials) out of Git. Two files are used for local development, both are `.gitignored`:
+
+1. **`server/src/main/resources/application-local.properties`** - Backend database credentials
+2. **`client/.env.local`** - Frontend API URLs
+
+### Quick Setup for Local Development
+
+#### Backend Setup
+```bash
+cd server/src/main/resources
+cp application-local.properties.example application-local.properties
+# Edit application-local.properties with your Railway database credentials
 ```
 
-### Server (application-local.properties)
-```
-spring.datasource.url=jdbc:postgresql://localhost:5432/codingstats
-spring.datasource.username=your_username
-spring.datasource.password=your_password
+**application-local.properties** (NOT committed to Git):
+```properties
+# Railway PostgreSQL Database
+spring.datasource.url=jdbc:postgresql://switchback.proxy.rlwy.net:46670/railway
+spring.datasource.username=postgres
+spring.datasource.password=your-railway-password
+cors.allowed.origins=http://localhost:3000,http://localhost:3001
 chess.username=shia_justdoit
 ```
 
+**Run with local profile:**
+```bash
+mvn spring-boot:run -Dspring-boot.run.profiles=local
+```
+
+#### Frontend Setup
+```bash
+cd client
+echo "NEXT_PUBLIC_API_URL=http://localhost:8080" > .env.local
+npm run dev
+```
+
+### How Environment Variables Work
+
+**Backend (application.properties):**
+The main `application.properties` file (committed to Git) uses placeholders:
+```properties
+spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/codingstats}
+spring.datasource.username=${SPRING_DATASOURCE_USERNAME:postgres}
+spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:postgres}
+```
+
+These will:
+1. Use `application-local.properties` values when running locally with `-Dspring-boot.run.profiles=local`
+2. Use Railway environment variables in production
+3. Fall back to default values (after `:`) if neither is set
+
+**Frontend (.env.local):**
+Next.js automatically loads `.env.local` during development. Variables prefixed with `NEXT_PUBLIC_` are accessible in browser code.
+
+### Security Notes
+- ✅ `.gitignore` already excludes: `application-local.properties`, `.env.local`
+- ✅ Never commit credentials to Git
+- ✅ Use different credentials for development and production
+- ⚠️ **Check before committing**: `git status` should NOT show these files
+
 ## Deployment
-- **Frontend**: Vercel (root directory: client)
-- **Backend**: Railway (root directory: server, PostgreSQL service)
+
+### Frontend (Vercel)
+- **Root directory**: `client`
+- **Environment Variables**: Set `NEXT_PUBLIC_API_URL` to your Railway backend URL
+- **Auto-deploy**: Pushes to `main` branch trigger deployment
+
+### Backend (Railway)
+- **Root directory**: `server`
+- **Database**: PostgreSQL service (linked or separate)
+- **Environment Variables**: Set via Railway dashboard:
+  - `SPRING_DATASOURCE_URL`
+  - `SPRING_DATASOURCE_USERNAME`
+  - `SPRING_DATASOURCE_PASSWORD`
+  - `CORS_ALLOWED_ORIGINS` (your Vercel URL)
+  - `CHESS_USERNAME`
+- **Auto-deploy**: Pushes to `main` branch trigger deployment
+
+**See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.**
 
 ## Project Features
 - LeetCode solutions with syntax highlighting and complexity analysis
