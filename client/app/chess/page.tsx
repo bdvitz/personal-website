@@ -1,12 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Trophy, TrendingUp, RefreshCw, Target, Zap, Clock, User, Search } from 'lucide-react'
+import { Trophy, TrendingUp, RefreshCw, Target, Zap, Clock, User, Search, Database, Calendar } from 'lucide-react'
 import RatingChart from '@/components/RatingChart'
 import StatsCard from '@/components/StatsCard'
 import WinLossChart from '@/components/WinLossChart'
-import HistoricalDataImport from '@/components/HistoricalDataImport'
-import { getChessStats, refreshChessStats, getRatingsOverTime, getRatingsByDateRange, fetchGuestHistory } from '@/lib/api'
+import { getChessStats, refreshChessStats, getRatingsOverTime, getRatingsByDateRange, fetchGuestHistory, importHistoricalData, verifyChessComUser } from '@/lib/api'
 
 interface ChessStats {
   username: string
@@ -30,14 +29,29 @@ export default function ChessPage() {
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [timeOption, setTimeOption] = useState('30') // '7', '30', '90', '365', 'all', 'custom'
-  const [customStartDate, setCustomStartDate] = useState('')
-  const [customEndDate, setCustomEndDate] = useState('')
+
+  // Custom range state - using year/month instead of date strings
+  const currentYear = new Date().getFullYear()
+  const currentMonth = new Date().getMonth() + 1
+  const [customStartYear, setCustomStartYear] = useState(2020)
+  const [customStartMonth, setCustomStartMonth] = useState(1)
+  const [customEndYear, setCustomEndYear] = useState(currentYear)
+  const [customEndMonth, setCustomEndMonth] = useState(currentMonth)
 
   // User mode: 'stored' for default user, 'guest' for custom lookups
   const [userMode, setUserMode] = useState<'stored' | 'guest'>('stored')
   const [guestUsername, setGuestUsername] = useState('')
   const [searchUsername, setSearchUsername] = useState('')
-  const [guestLoading, setGuestLoading] = useState(false)
+  const [verifying, setVerifying] = useState(false)
+  const [userVerified, setUserVerified] = useState(false)
+  const [userJoinDate, setUserJoinDate] = useState<Date | null>(null) // Store user's Chess.com join date
+
+  // Client-side cache for fetched data
+  const [cachedData, setCachedData] = useState<{
+    username: string;
+    fullData: Map<string, any>; // Map of date -> rating data
+    fetchedRange: { startYear: number; startMonth: number; endYear: number; endMonth: number } | null;
+  } | null>(null)
 
   // Rating visibility toggles
   const [showRapid, setShowRapid] = useState(true)
@@ -48,12 +62,50 @@ export default function ChessPage() {
   // Graph options
   const [connectNulls, setConnectNulls] = useState(false)
 
+  // Helper function to format chart data from cached data
+  const formatChartDataFromCache = (startDate: Date, endDate: Date) => {
+    if (!cachedData || !cachedData.fullData) return null
+
+    const labels: string[] = []
+    const rapidRatings: (number | null)[] = []
+    const blitzRatings: (number | null)[] = []
+    const bulletRatings: (number | null)[] = []
+
+    let currentDate = new Date(startDate)
+    while (currentDate <= endDate) {
+      const dateKey = currentDate.toISOString().split('T')[0]
+      labels.push(dateKey)
+
+      const dayData = cachedData.fullData.get(dateKey)
+      if (dayData) {
+        rapidRatings.push(dayData.rapid || null)
+        blitzRatings.push(dayData.blitz || null)
+        bulletRatings.push(dayData.bullet || null)
+      } else {
+        rapidRatings.push(null)
+        blitzRatings.push(null)
+        bulletRatings.push(null)
+      }
+
+      currentDate.setDate(currentDate.getDate() + 1)
+    }
+
+    return {
+      labels,
+      datasets: [
+        { label: 'Rapid', data: rapidRatings, borderColor: '#22c55e', backgroundColor: '#22c55e33' },
+        { label: 'Blitz', data: blitzRatings, borderColor: '#3b82f6', backgroundColor: '#3b82f633' },
+        { label: 'Bullet', data: bulletRatings, borderColor: '#ef4444', backgroundColor: '#ef444433' }
+      ]
+    }
+  }
+
   // Fetch both current stats and historical chart data
-  const fetchData = async () => {
+  const fetchData = async (forceRefresh = false) => {
     try {
       setError(null)
 
-      let ratingsData
+      let ratingsData: any
       const username = userMode === 'stored' ? DEFAULT_USERNAME : guestUsername
 
       // For stored user, fetch stats from database
@@ -63,41 +115,86 @@ export default function ChessPage() {
 
         // Fetch ratings based on selected time option
         if (timeOption === 'custom') {
-          if (customStartDate && customEndDate) {
-            ratingsData = await getRatingsByDateRange(username, customStartDate, customEndDate)
-          } else {
-            setError('Please select both start and end dates for custom range')
-            ratingsData = await getRatingsOverTime(username, 30)
-          }
+          // Convert year/month to date strings for the API
+          const startDate = `${customStartYear}-${String(customStartMonth).padStart(2, '0')}-01`
+          const endDate = new Date(customEndYear, customEndMonth, 0).toISOString().split('T')[0] // Last day of month
+          ratingsData = await getRatingsByDateRange(username, startDate, endDate)
         } else if (timeOption === 'all') {
           ratingsData = await getRatingsOverTime(username, 10000)
         } else {
           ratingsData = await getRatingsOverTime(username, Number(timeOption))
         }
       } else {
-        // For guest users, fetch on-demand without database
+        // For guest users, use cached data if available and not forcing refresh
         setStats(null) // Guest users don't have current stats stored
 
         // Calculate date range based on time option
-        const endDate = new Date()
+        let endDate = new Date()
         let startDate = new Date()
 
-        if (timeOption === 'custom' && customStartDate && customEndDate) {
-          startDate = new Date(customStartDate)
+        if (timeOption === 'custom') {
+          startDate = new Date(customStartYear, customStartMonth - 1, 1)
+          endDate = new Date(customEndYear, customEndMonth, 0) // Last day of month
         } else if (timeOption === 'all') {
-          startDate = new Date('2010-01-01') // Chess.com started around 2007, this should be safe
+          // Use user's join date if available, otherwise default to 2010
+          startDate = userJoinDate ? new Date(userJoinDate) : new Date('2010-01-01')
         } else {
           const days = Number(timeOption)
           startDate.setDate(startDate.getDate() - days)
         }
 
-        ratingsData = await fetchGuestHistory(
-          username,
-          startDate.getFullYear(),
-          startDate.getMonth() + 1,
-          endDate.getFullYear(),
-          endDate.getMonth() + 1
-        )
+        // Check if we can use cached data
+        if (!forceRefresh && cachedData && cachedData.username === username && cachedData.fetchedRange) {
+          const cached = cachedData.fetchedRange
+          const cachedStart = new Date(cached.startYear, cached.startMonth - 1, 1)
+          const cachedEnd = new Date(cached.endYear, cached.endMonth, 0) // Last day of month
+
+          // If requested range is within cached range, use cache
+          if (startDate >= cachedStart && endDate <= cachedEnd) {
+            ratingsData = formatChartDataFromCache(startDate, endDate)
+          } else {
+            // Requested range extends beyond cache, show what we have with nulls
+            const displayStart = new Date(Math.min(startDate.getTime(), cachedStart.getTime()))
+            const displayEnd = new Date(Math.max(endDate.getTime(), cachedEnd.getTime()))
+            ratingsData = formatChartDataFromCache(displayStart, displayEnd)
+          }
+        }
+
+        // Only fetch if we don't have cached data or forcing refresh
+        if (!ratingsData || forceRefresh) {
+          ratingsData = await fetchGuestHistory(
+            username,
+            startDate.getFullYear(),
+            startDate.getMonth() + 1,
+            endDate.getFullYear(),
+            endDate.getMonth() + 1
+          )
+
+          // Store in cache
+          if (ratingsData && ratingsData.labels && ratingsData.datasets) {
+            const dataMap = new Map<string, any>()
+            ratingsData.labels.forEach((label: string, idx: number) => {
+              const dayData: any = {}
+              ratingsData.datasets.forEach((dataset: any) => {
+                if (dataset.label === 'Rapid') dayData.rapid = dataset.data[idx]
+                if (dataset.label === 'Blitz') dayData.blitz = dataset.data[idx]
+                if (dataset.label === 'Bullet') dayData.bullet = dataset.data[idx]
+              })
+              dataMap.set(label, dayData)
+            })
+
+            setCachedData({
+              username,
+              fullData: dataMap,
+              fetchedRange: {
+                startYear: startDate.getFullYear(),
+                startMonth: startDate.getMonth() + 1,
+                endYear: endDate.getFullYear(),
+                endMonth: endDate.getMonth() + 1
+              }
+            })
+          }
+        }
       }
 
       // Filter datasets based on visibility toggles
@@ -117,33 +214,97 @@ export default function ChessPage() {
       console.error('Error fetching chess data:', err)
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
-  // Handle guest user search
+  // Handle guest user verification
   const handleGuestSearch = async () => {
     if (!searchUsername.trim()) {
       setError('Please enter a username')
       return
     }
 
-    setGuestUsername(searchUsername.trim())
-    setUserMode('guest')
-    setLoading(true)
-    await fetchData()
+    setVerifying(true)
+    setError(null)
+    try {
+      const result = await verifyChessComUser(searchUsername.trim())
+
+      if (!result.exists) {
+        setError(result.message || 'User not found on Chess.com')
+        setUserVerified(false)
+        return
+      }
+
+      // User exists, set as guest user and fetch their current stats
+      setGuestUsername(searchUsername.trim())
+      setUserMode('guest')
+      setUserVerified(true)
+      setCachedData(null) // Clear cache when switching users
+
+      // Extract and store join date from verification result
+      if (result.data && result.data.joined) {
+        // Chess.com API returns Unix timestamp in seconds
+        const joinDate = new Date(result.data.joined * 1000)
+        setUserJoinDate(joinDate)
+        console.log('User joined Chess.com on:', joinDate.toLocaleDateString())
+      }
+
+      // Fetch current stats for the guest user
+      try {
+        const statsData = await getChessStats(searchUsername.trim())
+        setStats(statsData)
+      } catch (err: any) {
+        console.error('Could not fetch guest stats:', err)
+        // Don't set error here, stats are optional for guests
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to verify user')
+      setUserVerified(false)
+    } finally {
+      setVerifying(false)
+    }
   }
 
-  // Force refresh from Chess.com API
-  const handleRefresh = async () => {
+  // Refresh current stats from Chess.com
+  const handleRefreshStats = async () => {
     setRefreshing(true)
+    setError(null)
     try {
       const username = userMode === 'stored' ? DEFAULT_USERNAME : guestUsername
-      if (userMode === 'stored') {
-        await refreshChessStats(username)
-      }
-      await fetchData()
+      const statsData = await refreshChessStats(username)
+      setStats(statsData)
     } catch (err: any) {
-      setError('Failed to refresh stats. Please try again.')
+      setError(err.message || 'Failed to refresh stats. Please try again.')
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
+  // Refresh historical game data or import historical data
+  const handleRefresh = async () => {
+    setRefreshing(true)
+    setError(null)
+    try {
+      const username = userMode === 'stored' ? DEFAULT_USERNAME : guestUsername
+
+      if (userMode === 'stored' && timeOption === 'custom') {
+        // Import historical data for custom range
+        await importHistoricalData(
+          username,
+          customStartYear,
+          customStartMonth,
+          customEndYear,
+          customEndMonth
+        )
+        // After import, fetch the data
+        await fetchData(true)
+      } else {
+        // Fetch/refresh historical game data
+        await fetchData(true)
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to process request. Please try again.')
     } finally {
       setRefreshing(false)
     }
@@ -151,8 +312,40 @@ export default function ChessPage() {
 
   // Re-fetch data when time period or visibility toggles change
   useEffect(() => {
-    fetchData()
-  }, [timeOption, customStartDate, customEndDate, showRapid, showBlitz, showBullet, showPuzzle, userMode, guestUsername])
+    if (userMode === 'stored') {
+      // Stored users: auto-fetch data when settings change
+      fetchData()
+    } else if (userMode === 'guest' && guestUsername && cachedData && cachedData.username === guestUsername) {
+      // Guest users: only update chart from cache if data is already loaded
+      // Don't fetch new data - just re-render the existing cache with new filters
+      let endDate = new Date()
+      let startDate = new Date()
+
+      if (timeOption === 'custom') {
+        startDate = new Date(customStartYear, customStartMonth - 1, 1)
+        endDate = new Date(customEndYear, customEndMonth, 0) // Last day of month
+      } else if (timeOption === 'all') {
+        // Use user's join date if available, otherwise default to 2010
+        startDate = userJoinDate ? new Date(userJoinDate) : new Date('2010-01-01')
+      } else {
+        const days = Number(timeOption)
+        startDate.setDate(startDate.getDate() - days)
+      }
+
+      const chartData = formatChartDataFromCache(startDate, endDate)
+      if (chartData) {
+        // Filter datasets based on visibility toggles
+        chartData.datasets = chartData.datasets.filter((dataset: any) => {
+          if (dataset.label === 'Rapid') return showRapid
+          if (dataset.label === 'Blitz') return showBlitz
+          if (dataset.label === 'Bullet') return showBullet
+          return true
+        })
+        setChartData(chartData)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [timeOption, customStartYear, customStartMonth, customEndYear, customEndMonth, showRapid, showBlitz, showBullet, showPuzzle, userMode])
 
   if (loading) {
     return (
@@ -175,7 +368,7 @@ export default function ChessPage() {
           <h2 className="text-2xl font-bold text-white mb-2">Error Loading Stats</h2>
           <p className="text-red-200 mb-6">{error}</p>
           <button
-            onClick={fetchData}
+            onClick={() => fetchData()}
             className="btn-primary"
           >
             Try Again
@@ -211,6 +404,8 @@ export default function ChessPage() {
                 setUserMode('stored')
                 setGuestUsername('')
                 setSearchUsername('')
+                setUserVerified(false)
+                setUserJoinDate(null)
               }}
               className={`px-6 py-2 rounded-lg font-semibold transition-all duration-200 ${
                 userMode === 'stored'
@@ -246,10 +441,10 @@ export default function ChessPage() {
               />
               <button
                 onClick={handleGuestSearch}
-                disabled={loading}
+                disabled={verifying}
                 className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100"
               >
-                {loading ? 'Loading...' : 'Search'}
+                {verifying ? 'Verifying...' : 'Verify User'}
               </button>
             </div>
           )}
@@ -257,9 +452,51 @@ export default function ChessPage() {
 
         {userMode === 'guest' && (
           <div className="mt-4 text-sm text-purple-300 bg-purple-800/30 rounded-lg p-3">
-            <p>Note: Guest user data is fetched on-demand and may take a while to load. Data is not stored in our database.</p>
+            <p><strong>How it works:</strong> Select your desired time range below, then click "Retrieve Data" to fetch chess history. Data will be cached so you can switch between smaller time ranges without re-fetching.</p>
           </div>
         )}
+
+        {/* User verification status messages - Only for guest mode */}
+        {userMode === 'guest' && error && (
+          <div className="mt-4 bg-red-500/20 border border-red-400/50 rounded-lg p-4">
+            <p className="text-red-200">{error}</p>
+          </div>
+        )}
+
+        {userMode === 'guest' && userVerified && guestUsername && (
+          <div className="mt-4 bg-green-500/20 border border-green-400/50 rounded-lg p-4">
+            <p className="text-green-200">
+              ✓ User <strong>{guestUsername}</strong> verified successfully!
+              {userJoinDate && (
+                <span className="ml-1">
+                  (Joined: {userJoinDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })})
+                </span>
+              )}
+            </p>
+            <p className="text-green-200 text-sm mt-1">
+              You can now retrieve their chess statistics.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Info Card - For all users */}
+      <div className="card bg-blue-900/20 border border-blue-500/30">
+        <div className="flex items-start space-x-3">
+          <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
+            <Database className="w-5 h-5 text-blue-400" />
+          </div>
+          <div>
+            <h3 className="text-blue-200 font-semibold mb-1">
+              {userMode === 'stored' ? 'Historical Data Import' : 'Chess History Lookup'}
+            </h3>
+            <p className="text-blue-300/80 text-sm">
+              {userMode === 'stored'
+                ? 'Import your complete game history from Chess.com to populate historical rating data for detailed analysis. Use the "Custom Range" option below to select a date range and click "Import Historical Data" to begin.'
+                : 'View chess statistics and rating history for any Chess.com user. First verify the username, then select a time range and retrieve their historical game data.'}
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Controls */}
@@ -280,14 +517,28 @@ export default function ChessPage() {
               <option value="custom">Custom Range</option>
             </select>
           </div>
-          <button
-            onClick={handleRefresh}
-            disabled={refreshing}
-            className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100 flex items-center space-x-2"
-          >
-            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
-            <span>{refreshing ? 'Refreshing...' : 'Refresh Data'}</span>
-          </button>
+          <div className="flex gap-3">
+            <button
+              onClick={handleRefreshStats}
+              disabled={refreshing || (userMode === 'guest' && !userVerified)}
+              className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100 flex items-center space-x-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>Refresh Stats</span>
+            </button>
+            <button
+              onClick={handleRefresh}
+              disabled={refreshing || (userMode === 'guest' && !userVerified)}
+              className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100 flex items-center space-x-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>
+                {refreshing
+                  ? (timeOption === 'custom' && userMode === 'stored' ? 'Importing...' : 'Retrieving...')
+                  : (timeOption === 'custom' && userMode === 'stored' ? 'Import Historical Data' : 'Refresh Historical Data')}
+              </span>
+            </button>
+          </div>
         </div>
 
         {/* Rating Type Toggles */}
@@ -348,41 +599,92 @@ export default function ChessPage() {
         {/* Custom Date Range Picker */}
         {timeOption === 'custom' && (
           <div className="card bg-purple-900/30">
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-purple-200 font-medium mb-2">Start Date</label>
-                <input
-                  type="date"
-                  value={customStartDate}
-                  onChange={(e) => setCustomStartDate(e.target.value)}
-                  className="w-full bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200"
-                />
+            <div className="grid md:grid-cols-2 gap-6">
+              {/* Start Date */}
+              <div className="space-y-3">
+                <label className="flex items-center text-purple-200 font-medium">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Start Date
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-purple-300 text-sm mb-1 block">Year</label>
+                    <select
+                      value={customStartYear}
+                      onChange={(e) => setCustomStartYear(Number(e.target.value))}
+                      disabled={refreshing}
+                      className="w-full bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200 disabled:opacity-50"
+                    >
+                      {Array.from({ length: currentYear - 2019 }, (_, i) => 2020 + i).map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-purple-300 text-sm mb-1 block">Month</label>
+                    <select
+                      value={customStartMonth}
+                      onChange={(e) => setCustomStartMonth(Number(e.target.value))}
+                      disabled={refreshing}
+                      className="w-full bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200 disabled:opacity-50"
+                    >
+                      {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((month, idx) => (
+                        <option key={idx + 1} value={idx + 1}>{month}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
-              <div>
-                <label className="block text-purple-200 font-medium mb-2">End Date</label>
-                <input
-                  type="date"
-                  value={customEndDate}
-                  onChange={(e) => setCustomEndDate(e.target.value)}
-                  className="w-full bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200"
-                />
+
+              {/* End Date */}
+              <div className="space-y-3">
+                <label className="flex items-center text-purple-200 font-medium">
+                  <Calendar className="w-4 h-4 mr-2" />
+                  End Date
+                </label>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-purple-300 text-sm mb-1 block">Year</label>
+                    <select
+                      value={customEndYear}
+                      onChange={(e) => setCustomEndYear(Number(e.target.value))}
+                      disabled={refreshing}
+                      className="w-full bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200 disabled:opacity-50"
+                    >
+                      {Array.from({ length: currentYear - 2019 }, (_, i) => 2020 + i).map((year) => (
+                        <option key={year} value={year}>{year}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-purple-300 text-sm mb-1 block">Month</label>
+                    <select
+                      value={customEndMonth}
+                      onChange={(e) => setCustomEndMonth(Number(e.target.value))}
+                      disabled={refreshing}
+                      className="w-full bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200 disabled:opacity-50"
+                    >
+                      {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map((month, idx) => (
+                        <option key={idx + 1} value={idx + 1}>{month}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         )}
       </div>
 
-      {error && (
+      {/* Error messages for stored users only (guest errors shown above) */}
+      {userMode === 'stored' && error && (
         <div className="bg-red-500/20 border border-red-400/50 rounded-lg p-4">
           <p className="text-red-200">{error}</p>
         </div>
       )}
 
-      {/* Historical Data Import - Only for stored user */}
-      {userMode === 'stored' && <HistoricalDataImport />}
-
-      {/* Current Ratings - Only for stored user */}
-      {userMode === 'stored' && stats && (
+      {/* Current Ratings - For stored user and verified guest users */}
+      {stats && (userMode === 'stored' || (userMode === 'guest' && userVerified)) && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatsCard
             title="Rapid"
@@ -421,7 +723,13 @@ export default function ChessPage() {
           <RatingChart data={chartData} connectNulls={connectNulls} />
         ) : (
           <div className="text-center py-12">
-            <p className="text-purple-200">No historical data available yet. Data will appear after the first scheduled update.</p>
+            <p className="text-purple-200">
+              {userMode === 'guest' && guestUsername
+                ? 'Select a time range above and click "Retrieve Data" to fetch chess history.'
+                : userMode === 'guest'
+                ? 'Enter a Chess.com username above to get started.'
+                : 'No historical data available yet. Data will appear after the first scheduled update.'}
+            </p>
           </div>
         )}
       </div>

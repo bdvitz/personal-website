@@ -139,6 +139,35 @@ public class ChessComApiService {
     }
 
     /**
+     * Fetch list of available game archives for a user
+     * @param username Chess.com username
+     * @return JsonNode containing archives array (URLs), or null if error
+     */
+    public JsonNode fetchAvailableArchives(String username) {
+        try {
+            String archivesUrl = CHESS_COM_API_BASE + username + "/games/archives";
+            logger.info("Fetching available archives from: {}", archivesUrl);
+            String response = restTemplate.getForObject(archivesUrl, String.class);
+
+            if (response != null) {
+                JsonNode rootNode = objectMapper.readTree(response);
+                logger.info("Successfully fetched archives list - {} archives found",
+                    rootNode.path("archives").size());
+                return rootNode;
+            }
+
+        } catch (HttpClientErrorException.NotFound e) {
+            logger.info("No archives found for user: {}", username);
+            return null;
+        } catch (Exception e) {
+            logger.error("Error fetching archives for user: {}", username, e);
+            return null;
+        }
+
+        return null;
+    }
+
+    /**
      * Fetch game archives for a specific month with retry logic for rate limiting
      * @param username Chess.com username
      * @param year Year (e.g., 2025)

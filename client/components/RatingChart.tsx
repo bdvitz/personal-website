@@ -97,7 +97,9 @@ export default function RatingChart({ data, connectNulls = false }: RatingChartP
         <XAxis
           dataKey="date"
           stroke="rgba(255,255,255,0.5)"
-          tick={{ fill: 'rgba(255,255,255,0.7)', angle: -45, textAnchor: 'end' }}
+          tick={{ fill: 'rgba(255,255,255,0.7)' } as any}
+          angle={-45}
+          textAnchor="end"
           height={80}
           tickFormatter={formatDate}
         />

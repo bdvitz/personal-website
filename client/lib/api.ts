@@ -90,6 +90,19 @@ export const importHistoricalData = async (
   }
 }
 
+// Verify Chess.com user exists
+export const verifyChessComUser = async (username: string) => {
+  try {
+    const response = await axios.get(`https://api.chess.com/pub/player/${username}`)
+    return { exists: true, data: response.data }
+  } catch (error: any) {
+    if (error.response?.data?.code === 0) {
+      return { exists: false, message: error.response.data.message }
+    }
+    throw new Error('Failed to verify user')
+  }
+}
+
 // Fetch guest user historical data without storing in database
 export const fetchGuestHistory = async (
   username: string,

@@ -40,6 +40,9 @@ yarn-error.log*
 application-local.properties
 **/application-local.properties
 
+# Database clearing files
+server/clear_database_commands/*
+
 # Temporary files
 *.tmp
 *.temp

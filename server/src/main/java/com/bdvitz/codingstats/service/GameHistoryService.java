@@ -48,35 +48,51 @@ public class GameHistoryService {
         int totalGamesProcessed = 0;
         int totalRatingsRecorded = 0;
 
-        // Iterate through each month from start date to current month
-        for (int year = startYear; year <= currentYear; year++) {
-            int monthStart = (year == startYear) ? startMonth : 1;
-            int monthEnd = (year == currentYear) ? currentMonth : 12;
+        // Fetch available archives first
+        Set<String> validArchives = getValidArchivesInRange(username, startYear, startMonth, currentYear, currentMonth);
 
-            for (int month = monthStart; month <= monthEnd; month++) {
-                try {
-                    // Add a small delay to be respectful to Chess.com API
-                    if (totalMonthsProcessed > 0) {
-                        Thread.sleep(300); // 300ms delay between requests
-                    }
+        if (validArchives.isEmpty()) {
+            logger.warn("No valid archives found for user {} in the specified range", username);
+            Map<String, Object> result = new HashMap<>();
+            result.put("monthsProcessed", 0);
+            result.put("gamesProcessed", 0);
+            result.put("ratingsRecorded", 0);
+            result.put("status", "no_data");
+            return result;
+        }
 
-                    JsonNode monthData = chessComApiService.fetchMonthlyGames(username, year, month);
+        logger.info("Found {} valid archive months to process", validArchives.size());
 
-                    if (monthData != null) {
-                        int gamesProcessed = processMonthlyGames(username, monthData);
-                        totalGamesProcessed += gamesProcessed;
-                        totalMonthsProcessed++;
+        // Process only the valid archives
+        for (String archive : validArchives) {
+            try {
+                // Parse year/month from archive URL
+                // Format: https://api.chess.com/pub/player/{username}/games/YYYY/MM
+                String[] parts = archive.split("/");
+                int year = Integer.parseInt(parts[parts.length - 2]);
+                int month = Integer.parseInt(parts[parts.length - 1]);
 
-                        logger.info("Processed {}/{}: {} games", year, month, gamesProcessed);
-                    }
-                } catch (InterruptedException e) {
-                    logger.error("Import interrupted", e);
-                    Thread.currentThread().interrupt();
-                    break;
-                } catch (Exception e) {
-                    logger.error("Error processing {}/{}: {}", year, month, e.getMessage());
-                    // Continue with next month even if one fails
+                // Add a small delay to be respectful to Chess.com API
+                if (totalMonthsProcessed > 0) {
+                    Thread.sleep(300); // 300ms delay between requests
                 }
+
+                JsonNode monthData = chessComApiService.fetchMonthlyGames(username, year, month);
+
+                if (monthData != null) {
+                    int gamesProcessed = processMonthlyGames(username, monthData);
+                    totalGamesProcessed += gamesProcessed;
+                    totalMonthsProcessed++;
+
+                    logger.info("Processed {}/{}: {} games", year, month, gamesProcessed);
+                }
+            } catch (InterruptedException e) {
+                logger.error("Import interrupted", e);
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                logger.error("Error processing archive {}: {}", archive, e.getMessage());
+                // Continue with next month even if one fails
             }
         }
 
@@ -93,6 +109,66 @@ public class GameHistoryService {
                 totalMonthsProcessed, totalGamesProcessed, totalRatingsRecorded);
 
         return result;
+    }
+
+    /**
+     * Get valid archives from Chess.com API that fall within the specified date range
+     * @param username Chess.com username
+     * @param startYear Starting year
+     * @param startMonth Starting month (1-12)
+     * @param endYear Ending year
+     * @param endMonth Ending month (1-12)
+     * @return Set of archive URLs that are within the date range
+     */
+    private Set<String> getValidArchivesInRange(String username, int startYear, int startMonth, int endYear, int endMonth) {
+        Set<String> validArchives = new LinkedHashSet<>();
+
+        try {
+            JsonNode archivesData = chessComApiService.fetchAvailableArchives(username);
+
+            if (archivesData == null || archivesData.path("archives").isMissingNode()) {
+                return validArchives;
+            }
+
+            JsonNode archivesArray = archivesData.path("archives");
+
+            for (JsonNode archive : archivesArray) {
+                String archiveUrl = archive.asText();
+
+                // Parse year/month from URL
+                // Format: https://api.chess.com/pub/player/{username}/games/YYYY/MM
+                String[] parts = archiveUrl.split("/");
+                if (parts.length >= 2) {
+                    try {
+                        int year = Integer.parseInt(parts[parts.length - 2]);
+                        int month = Integer.parseInt(parts[parts.length - 1]);
+
+                        // Check if this archive is within our date range
+                        if (isDateInRange(year, month, startYear, startMonth, endYear, endMonth)) {
+                            validArchives.add(archiveUrl);
+                        }
+                    } catch (NumberFormatException e) {
+                        logger.warn("Could not parse year/month from archive URL: {}", archiveUrl);
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.error("Error fetching valid archives: {}", e.getMessage());
+        }
+
+        return validArchives;
+    }
+
+    /**
+     * Check if a given year/month is within the specified date range
+     */
+    private boolean isDateInRange(int year, int month, int startYear, int startMonth, int endYear, int endMonth) {
+        // Convert to comparable integers (YYYYMM format)
+        int current = year * 100 + month;
+        int start = startYear * 100 + startMonth;
+        int end = endYear * 100 + endMonth;
+
+        return current >= start && current <= end;
     }
 
     /**
@@ -254,32 +330,47 @@ public class GameHistoryService {
         Map<LocalDate, DailyRatingData> dailyRatingsMap = new TreeMap<>();
         int totalGamesProcessed = 0;
 
-        // Iterate through each month from start date to end date
-        for (int year = startYear; year <= currentYear; year++) {
-            int monthStart = (year == startYear) ? startMonth : 1;
-            int monthEnd = (year == currentYear) ? currentMonth : 12;
+        // Fetch available archives first
+        Set<String> validArchives = getValidArchivesInRange(username, startYear, startMonth, currentYear, currentMonth);
 
-            for (int month = monthStart; month <= monthEnd; month++) {
-                try {
-                    // Add a small delay to be respectful to Chess.com API
-                    if (totalGamesProcessed > 0) {
-                        Thread.sleep(300); // 300ms delay between requests
-                    }
+        if (validArchives.isEmpty()) {
+            logger.warn("No valid archives found for guest user {} in the specified range", username);
+            Map<String, Object> result = new HashMap<>();
+            result.put("labels", new ArrayList<>());
+            result.put("datasets", new ArrayList<>());
+            result.put("gamesProcessed", 0);
+            result.put("status", "no_data");
+            return result;
+        }
 
-                    JsonNode monthData = chessComApiService.fetchMonthlyGames(username, year, month);
+        logger.info("Found {} valid archive months to process for guest user", validArchives.size());
 
-                    if (monthData != null) {
-                        int gamesProcessed = processMonthlyGamesForGuest(username, monthData, dailyRatingsMap);
-                        totalGamesProcessed += gamesProcessed;
-                        logger.info("Processed {}/{}: {} games for guest user", year, month, gamesProcessed);
-                    }
-                } catch (InterruptedException e) {
-                    logger.error("Fetch interrupted", e);
-                    Thread.currentThread().interrupt();
-                    break;
-                } catch (Exception e) {
-                    logger.error("Error processing {}/{}: {}", year, month, e.getMessage());
+        // Process only the valid archives
+        for (String archive : validArchives) {
+            try {
+                // Parse year/month from archive URL
+                String[] parts = archive.split("/");
+                int year = Integer.parseInt(parts[parts.length - 2]);
+                int month = Integer.parseInt(parts[parts.length - 1]);
+
+                // Add a small delay to be respectful to Chess.com API
+                if (totalGamesProcessed > 0) {
+                    Thread.sleep(300); // 300ms delay between requests
                 }
+
+                JsonNode monthData = chessComApiService.fetchMonthlyGames(username, year, month);
+
+                if (monthData != null) {
+                    int gamesProcessed = processMonthlyGamesForGuest(username, monthData, dailyRatingsMap);
+                    totalGamesProcessed += gamesProcessed;
+                    logger.info("Processed {}/{}: {} games for guest user", year, month, gamesProcessed);
+                }
+            } catch (InterruptedException e) {
+                logger.error("Fetch interrupted", e);
+                Thread.currentThread().interrupt();
+                break;
+            } catch (Exception e) {
+                logger.error("Error processing archive {}: {}", archive, e.getMessage());
             }
         }
 
