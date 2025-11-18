@@ -383,25 +383,8 @@ export default function ChessPage() {
     )
   }
 
-  if (error && !stats) {
-    return (
-      <div className="card max-w-2xl mx-auto">
-        <div className="text-center">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Trophy className="w-8 h-8 text-red-400" />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-2">Error Loading Stats</h2>
-          <p className="text-red-200 mb-6">{error}</p>
-          <button
-            onClick={() => fetchData()}
-            className="btn-primary"
-          >
-            Try Again
-          </button>
-        </div>
-      </div>
-    )
-  }
+  // Note: Removed the early return for error state to allow guest lookup even when server is down
+  // Error messages are now shown inline within the page instead
 
   const winRate = stats ? ((stats.wins / stats.totalGames) * 100).toFixed(1) : '0'
 
@@ -713,9 +696,42 @@ export default function ChessPage() {
       </div>
 
       {/* Error messages for stored users only (guest errors shown above) */}
-      {userMode === 'stored' && error && (
-        <div className="bg-red-500/20 border border-red-400/50 rounded-lg p-4">
-          <p className="text-red-200">{error}</p>
+      {userMode === 'stored' && error && !stats && (
+        <div className="card max-w-2xl mx-auto">
+          <div className="text-center">
+            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+              <Trophy className="w-8 h-8 text-red-400" />
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Server Connection Error</h2>
+            <p className="text-red-200 mb-6">{error}</p>
+            <button
+              onClick={() => fetchData()}
+              className="btn-primary"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      )}
+      {userMode === 'stored' && error && stats && (
+        <div className="bg-yellow-500/20 border border-yellow-400/50 rounded-lg p-4">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+              </svg>
+            </div>
+            <div className="ml-3 flex-1">
+              <p className="text-yellow-200 font-semibold">Connection Issue</p>
+              <p className="text-yellow-200 text-sm mt-1">{error}</p>
+              <button
+                onClick={() => fetchData()}
+                className="mt-3 text-yellow-300 hover:text-yellow-100 text-sm font-medium underline"
+              >
+                Try reconnecting
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

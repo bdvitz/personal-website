@@ -109,7 +109,7 @@ export const getGuestStats = async (username: string) => {
     const response = await apiClient.get(`/api/chess/stats/guest-current`, { params: { username } })
     return response.data
   } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to fetch guest statistics')
+    throw new Error(error.response?.data?.error || 'Failed to fetch guest statistics. Unable to connect to server and make api requests.')
   }
 }
 
