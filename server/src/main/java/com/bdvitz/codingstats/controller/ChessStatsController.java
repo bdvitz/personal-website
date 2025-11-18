@@ -45,14 +45,15 @@ public class ChessStatsController {
     }
     
     /**
-     * Fetch and update chess statistics from Chess.com
+     * Fetch and update current chess statistics from Chess.com
+     * Does NOT update daily_ratings table (only updates chess_stats table)
      * POST /api/chess/stats/refresh?username=shia_justdoit
      */
     @PostMapping("/refresh")
     public ResponseEntity<?> refreshStats(@RequestParam String username) {
         try {
-            logger.info("Refreshing stats for user: {}", username);
-            ChessStat stats = chessStatsService.fetchAndStoreStats(username);
+            logger.info("Refreshing current stats for user: {}", username);
+            ChessStat stats = chessStatsService.fetchAndUpdateCurrentStats(username);
             return ResponseEntity.ok(stats);
         } catch (Exception e) {
             logger.error("Error refreshing stats", e);

@@ -56,11 +56,45 @@ public class ChessStatsService {
     }
 
     /**
+     * Fetch and update ONLY current chess statistics from Chess.com
+     * Does NOT update daily_ratings table - used for manual refresh button
+     */
+    @Transactional
+    public ChessStat fetchAndUpdateCurrentStats(String username) {
+        logger.info("Fetching current stats for user (no daily snapshot): {}", username);
+
+        // Fetch stats from Chess.com API
+        Map<String, Object> apiStats = chessComApiService.fetchChessStats(username);
+
+        // Find or create ChessStat entity
+        ChessStat chessStat = chessStatRepository.findByUsername(username)
+                .orElse(new ChessStat(username));
+
+        // Update stats
+        chessStat.setRapidRating((Integer) apiStats.get("rapidRating"));
+        chessStat.setBlitzRating((Integer) apiStats.get("blitzRating"));
+        chessStat.setBulletRating((Integer) apiStats.get("bulletRating"));
+        chessStat.setPuzzleRating((Integer) apiStats.get("puzzleRating"));
+        chessStat.setTotalGames((Integer) apiStats.get("totalGames"));
+        chessStat.setWins((Integer) apiStats.get("wins"));
+        chessStat.setLosses((Integer) apiStats.get("losses"));
+        chessStat.setDraws((Integer) apiStats.get("draws"));
+        chessStat.setLastUpdated(LocalDateTime.now());
+
+        // Save to database (chess_stats table only)
+        ChessStat saved = chessStatRepository.save(chessStat);
+
+        logger.info("Successfully updated current stats for user: {}", username);
+        return saved;
+    }
+
+    /**
      * Fetch and store chess statistics from Chess.com
+     * Also creates/updates daily_ratings snapshot - used for scheduled tasks
      */
     @Transactional
     public ChessStat fetchAndStoreStats(String username) {
-        logger.info("Fetching stats for user: {}", username);
+        logger.info("Fetching stats for user (with daily snapshot): {}", username);
 
         // Fetch stats from Chess.com API
         Map<String, Object> apiStats = chessComApiService.fetchChessStats(username);
@@ -86,7 +120,7 @@ public class ChessStatsService {
         // Also create daily rating snapshot
         saveDailyRating(username, saved);
 
-        logger.info("Successfully updated stats for user: {}", username);
+        logger.info("Successfully updated stats for user with daily snapshot: {}", username);
         return saved;
     }
     
@@ -224,8 +258,9 @@ public class ChessStatsService {
     
     /**
      * Check if user has stats in database
+     * UNUSED - Can be commented out or removed
      */
-    public boolean hasStats(String username) {
-        return chessStatRepository.existsByUsername(username);
-    }
+    // public boolean hasStats(String username) {
+    //     return chessStatRepository.existsByUsername(username);
+    // }
 }
