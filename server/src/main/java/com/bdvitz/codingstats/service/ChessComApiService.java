@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -22,7 +23,11 @@ public class ChessComApiService {
     private final ObjectMapper objectMapper;
     
     public ChessComApiService() {
-        this.restTemplate = new RestTemplate();
+        // Configure RestTemplate with timeouts to prevent infinite hangs
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(5000);  // 5 seconds to establish connection
+        factory.setReadTimeout(10000);     // 10 seconds to read response
+        this.restTemplate = new RestTemplate(factory);
         this.objectMapper = new ObjectMapper();
     }
     
@@ -175,9 +180,9 @@ public class ChessComApiService {
      * @return JsonNode containing games array, or null if no games available
      */
     public JsonNode fetchMonthlyGames(String username, int year, int month) {
-        int maxRetries = 5;
+        int maxRetries = 3;
         int retryCount = 0;
-        long baseDelayMs = 1000; // Start with 1 second
+        long baseDelayMs = 500; // Start with 500ms
 
         while (retryCount < maxRetries) {
             try {
@@ -197,7 +202,7 @@ public class ChessComApiService {
             } catch (HttpClientErrorException e) {
                 if (e.getStatusCode() == HttpStatus.TOO_MANY_REQUESTS) {
                     retryCount++;
-                    // Exponential backoff: 1s, 2s, 4s, 8s, 16s
+                    // Exponential backoff: 500ms, 1s, 2s
                     long delayMs = baseDelayMs * (1L << (retryCount - 1));
 
                     logger.warn("Rate limited (429) for {}/{}. Retry {}/{} after {}ms",
