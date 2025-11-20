@@ -1,11 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Trophy, TrendingUp, RefreshCw, Target, Zap, Clock, User, Search, Database, Calendar } from 'lucide-react'
+import { Trophy, TrendingUp, RefreshCw, Target, Zap, Clock, User, Search, Calendar } from 'lucide-react'
 import RatingChart from '@/components/RatingChart'
 import StatsCard from '@/components/StatsCard'
 import WinLossChart from '@/components/WinLossChart'
-import { getChessStats, getGuestStats, refreshChessStats, getRatingsOverTime, getRatingsByDateRange, fetchGuestHistory, importHistoricalData, verifyChessComUser } from '@/lib/api'
+import { getChessStats, getGuestStats, refreshChessStats, getRatingsOverTime, getRatingsByDateRange, fetchGuestHistoryMonth, importHistoricalData, verifyChessComUser } from '@/lib/api'
 
 interface ChessStats {
   username: string
@@ -63,6 +63,13 @@ export default function ChessPage() {
   // Graph options
   const [connectNulls, setConnectNulls] = useState(false)
 
+  // Progress tracking for month-by-month fetching
+  const [fetchProgress, setFetchProgress] = useState<{
+    current: number;
+    total: number;
+    currentMonth: string;
+  } | null>(null)
+
   // Helper function to calculate date range based on time option
   const calculateDateRange = (option: string, customStart?: { year: number; month: number }, customEnd?: { year: number; month: number }): { startDate: Date; endDate: Date } => {
     let endDate = new Date()
@@ -93,10 +100,54 @@ export default function ChessPage() {
     })
   }
 
-  // Helper function to format chart data from cached data
-  const formatChartDataFromCache = (startDate: Date, endDate: Date) => {
-    if (!cachedData || !cachedData.fullData) return null
+  // Helper function to generate list of months in a date range
+  const generateMonthList = (startDate: Date, endDate: Date): { year: number; month: number }[] => {
+    const months: { year: number; month: number }[] = []
+    const current = new Date(startDate.getFullYear(), startDate.getMonth(), 1)
+    const end = new Date(endDate.getFullYear(), endDate.getMonth(), 1)
 
+    while (current <= end) {
+      months.push({
+        year: current.getFullYear(),
+        month: current.getMonth() + 1 // JavaScript months are 0-indexed
+      })
+      current.setMonth(current.getMonth() + 1)
+    }
+
+    return months
+  }
+
+  // Helper function to fetch a single month with retry logic (up to 3 attempts)
+  const fetchMonthWithRetry = async (
+    username: string,
+    year: number,
+    month: number,
+    maxRetries: number = 3
+  ): Promise<any> => {
+    let lastError: Error | null = null
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const monthData = await fetchGuestHistoryMonth(username, year, month)
+        return monthData
+      } catch (error: any) {
+        lastError = error
+        console.warn(`Attempt ${attempt}/${maxRetries} failed for ${year}-${month.toString().padStart(2, '0')}: ${error.message}`)
+
+        // Wait before retrying (exponential backoff: 1s, 2s, 4s)
+        if (attempt < maxRetries) {
+          const delayMs = 1000 * Math.pow(2, attempt - 1)
+          await new Promise(resolve => setTimeout(resolve, delayMs))
+        }
+      }
+    }
+
+    // All retries failed
+    throw lastError || new Error(`Failed to fetch data for ${year}-${month}`)
+  }
+
+  // Helper function to format chart data from a data map
+  const formatChartData = (dataMap: Map<string, any>, startDate: Date, endDate: Date) => {
     const labels: string[] = []
     const rapidRatings: (number | null)[] = []
     const blitzRatings: (number | null)[] = []
@@ -107,7 +158,7 @@ export default function ChessPage() {
       const dateKey = currentDate.toISOString().split('T')[0]
       labels.push(dateKey)
 
-      const dayData = cachedData.fullData.get(dateKey)
+      const dayData = dataMap.get(dateKey)
       if (dayData) {
         rapidRatings.push(dayData.rapid || null)
         blitzRatings.push(dayData.blitz || null)
@@ -129,6 +180,12 @@ export default function ChessPage() {
         { label: 'Bullet', data: bulletRatings, borderColor: '#ef4444', backgroundColor: '#ef444433' }
       ]
     }
+  }
+
+  // Helper function to format chart data from cached data (wrapper)
+  const formatChartDataFromCache = (startDate: Date, endDate: Date) => {
+    if (!cachedData || !cachedData.fullData) return null
+    return formatChartData(cachedData.fullData, startDate, endDate)
   }
 
   // Fetch historical chart data only (stats are fetched separately)
@@ -181,38 +238,71 @@ export default function ChessPage() {
 
         // Only fetch if we don't have cached data or forcing refresh
         if (!ratingsData || forceRefresh) {
-          ratingsData = await fetchGuestHistory(
-            username,
-            startDate.getFullYear(),
-            startDate.getMonth() + 1,
-            endDate.getFullYear(),
-            endDate.getMonth() + 1
-          )
+          // Fetch month-by-month with progress tracking
+          const months = generateMonthList(startDate, endDate)
+          const dataMap = new Map<string, any>()
+          let totalGamesProcessed = 0
+
+          for (let i = 0; i < months.length; i++) {
+            const { year, month } = months[i]
+            const monthStr = `${year}-${month.toString().padStart(2, '0')}`
+
+            // Add delay between requests to be respectful to Chess.com API (except first request)
+            if (i > 0) {
+              await new Promise(resolve => setTimeout(resolve, 300)) // 300ms delay
+            }
+
+            // Update progress indicator
+            setFetchProgress({
+              current: i + 1,
+              total: months.length,
+              currentMonth: monthStr
+            })
+
+            try {
+              // Fetch this month with retry logic
+              const monthData = await fetchMonthWithRetry(username, year, month)
+
+              if (monthData && monthData.labels && monthData.datasets) {
+                // Merge this month's data into the cache
+                monthData.labels.forEach((label: string, idx: number) => {
+                  const dayData: any = {}
+                  monthData.datasets.forEach((dataset: any) => {
+                    if (dataset.label === 'Rapid') dayData.rapid = dataset.data[idx]
+                    if (dataset.label === 'Blitz') dayData.blitz = dataset.data[idx]
+                    if (dataset.label === 'Bullet') dayData.bullet = dataset.data[idx]
+                  })
+                  // Only add if there's actual data (not all null)
+                  if (dayData.rapid || dayData.blitz || dayData.bullet) {
+                    dataMap.set(label, dayData)
+                  }
+                })
+
+                totalGamesProcessed += (monthData.gamesProcessed || 0)
+              }
+            } catch (error: any) {
+              console.error(`Failed to fetch ${monthStr} after retries:`, error.message)
+              // Continue with next month even if this one failed
+            }
+          }
+
+          // Clear progress indicator
+          setFetchProgress(null)
 
           // Store in cache
-          if (ratingsData && ratingsData.labels && ratingsData.datasets) {
-            const dataMap = new Map<string, any>()
-            ratingsData.labels.forEach((label: string, idx: number) => {
-              const dayData: any = {}
-              ratingsData.datasets.forEach((dataset: any) => {
-                if (dataset.label === 'Rapid') dayData.rapid = dataset.data[idx]
-                if (dataset.label === 'Blitz') dayData.blitz = dataset.data[idx]
-                if (dataset.label === 'Bullet') dayData.bullet = dataset.data[idx]
-              })
-              dataMap.set(label, dayData)
-            })
+          setCachedData({
+            username,
+            fullData: dataMap,
+            fetchedRange: {
+              startYear: startDate.getFullYear(),
+              startMonth: startDate.getMonth() + 1,
+              endYear: endDate.getFullYear(),
+              endMonth: endDate.getMonth() + 1
+            }
+          })
 
-            setCachedData({
-              username,
-              fullData: dataMap,
-              fetchedRange: {
-                startYear: startDate.getFullYear(),
-                startMonth: startDate.getMonth() + 1,
-                endYear: endDate.getFullYear(),
-                endMonth: endDate.getMonth() + 1
-              }
-            })
-          }
+          // Format data for chart directly from the dataMap we just built
+          ratingsData = formatChartData(dataMap, startDate, endDate)
         }
       }
 
@@ -504,25 +594,6 @@ export default function ChessPage() {
         )}
       </div>
 
-      {/* Info Card - For all users
-      <div className="card bg-blue-900/20 border border-blue-500/30">
-        <div className="flex items-start space-x-3">
-          <div className="w-10 h-10 rounded-full bg-blue-500/20 flex items-center justify-center flex-shrink-0">
-            <Database className="w-5 h-5 text-blue-400" />
-          </div>
-          <div>
-            <h3 className="text-blue-200 font-semibold mb-1">
-              {userMode === 'stored' ? 'Historical Data Import' : 'Chess History Lookup'}
-            </h3>
-            <p className="text-blue-300/80 text-sm">
-              {userMode === 'stored'
-                ? 'Import your complete game history from Chess.com to populate historical rating data for detailed analysis. Use the "Custom Range" option below to select a date range and click "Import Historical Data" to begin.'
-                : 'View chess statistics and rating history for any Chess.com user. First verify the username, then select a time range and retrieve their historical game data.'}
-            </p>
-          </div>
-        </div>
-      </div> */}
-
       {/* Controls */}
       <div className="flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -595,15 +666,6 @@ export default function ChessPage() {
             />
             <span className="text-red-400 font-medium">Bullet</span>
           </label>
-          {/* <label className="flex items-center space-x-2 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={showPuzzle}
-              onChange={(e) => setShowPuzzle(e.target.checked)}
-              className="w-4 h-4 rounded border-purple-500 bg-purple-800/50 text-purple-500 focus:ring-purple-400 focus:ring-offset-0 cursor-pointer"
-            />
-            <span className="text-purple-400 font-medium">Puzzle</span>
-          </label> */}
           <label className="flex items-center space-x-2 cursor-pointer">
             <input
               type="checkbox"
@@ -634,7 +696,7 @@ export default function ChessPage() {
                       disabled={refreshing}
                       className="w-full bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200 disabled:opacity-50"
                     >
-                      {Array.from({ length: currentYear - 2019 }, (_, i) => 2020 + i).map((year) => (
+                      {Array.from({ length: currentYear - 2010 + 1 }, (_, i) => 2010 + i).map((year) => (
                         <option key={year} value={year}>{year}</option>
                       ))}
                     </select>
@@ -670,7 +732,7 @@ export default function ChessPage() {
                       disabled={refreshing}
                       className="w-full bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200 disabled:opacity-50"
                     >
-                      {Array.from({ length: currentYear - 2019 }, (_, i) => 2020 + i).map((year) => (
+                      {Array.from({ length: currentYear - 2010 + 1 }, (_, i) => 2010 + i).map((year) => (
                         <option key={year} value={year}>{year}</option>
                       ))}
                     </select>
@@ -694,6 +756,29 @@ export default function ChessPage() {
           </div>
         )}
       </div>
+
+      {/* Progress Indicator - Shown during month-by-month fetching */}
+      {fetchProgress && (
+        <div className="card bg-blue-900/30 border border-blue-500/50">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
+            <div className="flex-1">
+              <h3 className="text-blue-200 font-semibold text-lg mb-1">
+                Loading chess history...
+              </h3>
+              <p className="text-blue-300 text-sm">
+                Processing month {fetchProgress.current} of {fetchProgress.total} ({fetchProgress.currentMonth})
+              </p>
+              <div className="mt-3 w-full bg-blue-900/50 rounded-full h-2.5">
+                <div
+                  className="bg-blue-500 h-2.5 rounded-full transition-all duration-300"
+                  style={{ width: `${(fetchProgress.current / fetchProgress.total) * 100}%` }}
+                ></div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Error messages for stored users only (guest errors shown above) */}
       {userMode === 'stored' && error && !stats && (
@@ -722,14 +807,8 @@ export default function ChessPage() {
               </svg>
             </div>
             <div className="ml-3 flex-1">
-              <p className="text-yellow-200 font-semibold">Connection Issue</p>
+              <p className="text-yellow-200 font-semibold">Connection Issue. Server may be offline.</p>
               <p className="text-yellow-200 text-sm mt-1">{error}</p>
-              <button
-                onClick={() => fetchData()}
-                className="mt-3 text-yellow-300 hover:text-yellow-100 text-sm font-medium underline"
-              >
-                Try reconnecting
-              </button>
             </div>
           </div>
         </div>

@@ -198,6 +198,7 @@ public class ChessStatsController {
     /**
      * Fetch guest user historical data without storing in database
      * GET /api/chess/stats/guest-history?username=example&startYear=2020&startMonth=1&endYear=2025&endMonth=11
+     * @deprecated Use /guest-history-month for better memory efficiency
      */
     @GetMapping("/guest-history")
     public ResponseEntity<?> fetchGuestHistory(
@@ -216,6 +217,36 @@ public class ChessStatsController {
             return ResponseEntity.ok(result);
         } catch (Exception e) {
             logger.error("Error fetching guest history", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", e.getMessage(), "status", "failed"));
+        }
+    }
+
+    /**
+     * Fetch guest user historical data for a single month without storing in database
+     * GET /api/chess/stats/guest-history-month?username=example&year=2023&month=5
+     */
+    @GetMapping("/guest-history-month")
+    public ResponseEntity<?> fetchGuestHistoryMonth(
+            @RequestParam String username,
+            @RequestParam int year,
+            @RequestParam int month) {
+        try {
+            // Validate month
+            if (month < 1 || month > 12) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(Map.of("error", "Month must be between 1 and 12", "status", "failed"));
+            }
+
+            logger.info("Fetching guest history for user: {} for {}/{}",
+                    username, year, month);
+
+            Map<String, Object> result = gameHistoryService.fetchGuestUserHistoryForMonth(
+                    username, year, month);
+
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            logger.error("Error fetching guest history for month", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", e.getMessage(), "status", "failed"));
         }

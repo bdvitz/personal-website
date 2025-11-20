@@ -323,6 +323,56 @@ public class GameHistoryService {
     }
 
     /**
+     * Fetch historical game data for a guest user for a SINGLE month without storing in database
+     * More memory-efficient than fetchGuestUserHistory
+     * @param username Chess.com username
+     * @param year Year (e.g., 2023)
+     * @param month Month (1-12)
+     * @return Map with chart data for that single month
+     */
+    public Map<String, Object> fetchGuestUserHistoryForMonth(String username, int year, int month) {
+        logger.info("Fetching guest user history for single month: {} for {}/{}",
+                username, year, month);
+
+        // Track ratings by date without saving to database
+        Map<LocalDate, DailyRatingData> dailyRatingsMap = new TreeMap<>();
+        int totalGamesProcessed = 0;
+
+        try {
+            // Fetch only this specific month
+            JsonNode monthData = chessComApiService.fetchMonthlyGames(username, year, month);
+
+            if (monthData != null) {
+                int gamesProcessed = processMonthlyGamesForGuest(username, monthData, dailyRatingsMap);
+                totalGamesProcessed += gamesProcessed;
+                logger.info("Processed {}/{}: {} games for guest user", year, month, gamesProcessed);
+            } else {
+                logger.info("No games found for {}/{} for guest user {}", year, month, username);
+            }
+        } catch (Exception e) {
+            logger.error("Error processing month {}/{}: {}", year, month, e.getMessage());
+            Map<String, Object> errorResult = new HashMap<>();
+            errorResult.put("labels", new ArrayList<>());
+            errorResult.put("datasets", new ArrayList<>());
+            errorResult.put("gamesProcessed", 0);
+            errorResult.put("status", "error");
+            errorResult.put("error", e.getMessage());
+            return errorResult;
+        }
+
+        // Format the data for chart display
+        Map<String, Object> result = formatGuestChartData(dailyRatingsMap);
+        result.put("gamesProcessed", totalGamesProcessed);
+        result.put("status", totalGamesProcessed > 0 ? "completed" : "no_data");
+        result.put("year", year);
+        result.put("month", month);
+
+        logger.info("Guest user fetch completed for {}/{}. Games: {}", year, month, totalGamesProcessed);
+
+        return result;
+    }
+
+    /**
      * Fetch historical game data for a guest user without storing in database
      * @param username Chess.com username
      * @param startYear Starting year
@@ -330,6 +380,7 @@ public class GameHistoryService {
      * @param endYear Ending year (null = current year)
      * @param endMonth Ending month (null = current month)
      * @return Map with chart data and statistics
+     * @deprecated Use fetchGuestUserHistoryForMonth for better memory efficiency
      */
     public Map<String, Object> fetchGuestUserHistory(String username, int startYear, int startMonth, Integer endYear, Integer endMonth) {
         logger.info("Fetching guest user history for: {} from {}/{} to {}/{}",

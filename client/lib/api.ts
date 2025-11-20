@@ -113,7 +113,25 @@ export const getGuestStats = async (username: string) => {
   }
 }
 
+// Fetch guest user historical data for a single month without storing in database
+export const fetchGuestHistoryMonth = async (
+  username: string,
+  year: number,
+  month: number
+) => {
+  try {
+    const response = await apiClient.get(`/api/chess/stats/guest-history-month`, {
+      params: { username, year, month },
+      timeout: 30000, // 30 second timeout for single month
+    })
+    return response.data
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || 'Failed to fetch guest history for month')
+  }
+}
+
 // Fetch guest user historical data without storing in database
+// @deprecated Use fetchGuestHistoryMonth for better memory efficiency
 export const fetchGuestHistory = async (
   username: string,
   startYear: number,
