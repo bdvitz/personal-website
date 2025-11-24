@@ -6,8 +6,7 @@ import java.time.LocalDate;
 @Entity
 @Table(name = "daily_ratings", 
        uniqueConstraints = @UniqueConstraint(columnNames = {"username", "date"}))
-public class DailyRating {
-    
+public class ChessDailyRating {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -27,15 +26,12 @@ public class DailyRating {
     @Column(name = "bullet_rating")
     private Integer bulletRating;
     
-    @Column(name = "puzzle_rating")
-    private Integer puzzleRating;
-    
     // Constructors
-    public DailyRating() {
+    public ChessDailyRating() {
         this.date = LocalDate.now();
     }
     
-    public DailyRating(String username, LocalDate date) {
+    public ChessDailyRating(String username, LocalDate date) {
         this.username = username;
         this.date = date;
     }
@@ -87,13 +83,5 @@ public class DailyRating {
     
     public void setBulletRating(Integer bulletRating) {
         this.bulletRating = bulletRating;
-    }
-    
-    public Integer getPuzzleRating() {
-        return puzzleRating;
-    }
-    
-    public void setPuzzleRating(Integer puzzleRating) {
-        this.puzzleRating = puzzleRating;
     }
 }

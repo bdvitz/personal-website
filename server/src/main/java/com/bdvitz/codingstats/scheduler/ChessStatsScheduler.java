@@ -16,25 +16,21 @@ public class ChessStatsScheduler {
     @Autowired
     private ChessStatsService chessStatsService;
     
-    @Value("${chess.username:shia_justdoit}")
+    @Value("${chess.username}")
     private String chessUsername;
     
     /**
      * Scheduled task to fetch chess stats daily at 3 AM UTC
      * Cron expression: "0 0 3 * * *" = Every day at 03:00:00
-     *
-     * COMMENTED OUT: Not needed - stats are refreshed manually via UI
-     * Uncomment the @Scheduled annotation below to re-enable automatic daily updates
      */
-    // @Scheduled(cron = "0 0 3 * * *")
-    public void fetchDailyChessStats() {
+    @Scheduled(cron = "0 0 3 * * *")
+    public void fetchChessStatsScheduled() {
         logger.info("Starting scheduled chess stats fetch for user: {}", chessUsername);
-
         try {
-            chessStatsService.fetchAndStoreStats(chessUsername);
-            logger.info("Successfully completed scheduled chess stats fetch");
+            chessStatsService.fetchAndUpdateCurrentStats(chessUsername);
+            logger.info("Successfully completed scheduled chess stats update");
         } catch (Exception e) {
-            logger.error("Error during scheduled chess stats fetch", e);
+            logger.error("Error during scheduled chess stats update", e);
         }
     }
 }

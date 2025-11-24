@@ -9,5 +9,4 @@ import java.util.Optional;
 @Repository
 public interface ChessStatRepository extends JpaRepository<ChessStat, Long> {
     Optional<ChessStat> findByUsername(String username);
-    boolean existsByUsername(String username);
 }

@@ -1,7 +1,9 @@
 package com.bdvitz.codingstats.service;
 
+import com.bdvitz.codingstats.model.ChessStat;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -34,41 +36,46 @@ public class ChessComApiService {
     /**
      * Fetch chess statistics from Chess.com API
      * @param username Chess.com username
-     * @return Map containing rating statistics
+     * @return ChessStat object containing rating statistics
      */
-    public Map<String, Object> fetchChessStats(String username) {
-        Map<String, Object> stats = new HashMap<>();
-        
+    public ChessStat fetchChessStats(String username) throws RuntimeException {
         try {
             // Fetch player stats
             String statsUrl = CHESS_COM_API_BASE + username + "/stats";
             String response = restTemplate.getForObject(statsUrl, String.class);
-            
-            if (response != null) {
-                JsonNode rootNode = objectMapper.readTree(response);
-                
-                // Extract ratings from different game modes
-                stats.put("rapidRating", extractRating(rootNode, "chess_rapid"));
-                stats.put("blitzRating", extractRating(rootNode, "chess_blitz"));
-                stats.put("bulletRating", extractRating(rootNode, "chess_bullet"));
-                stats.put("puzzleRating", extractRating(rootNode, "tactics"));
-                
-                // Extract game statistics
-                Map<String, Integer> gameStats = extractGameStats(rootNode);
-                stats.putAll(gameStats);
-                
-                logger.info("Successfully fetched stats for user: {}", username);
+
+            if (response == null) {
+                throw new RuntimeException("Received null response from Chess.com API");
             }
-            
+
+            JsonNode rootNode = objectMapper.readTree(response);
+
+            // Create ChessStat object
+            ChessStat chessStat = new ChessStat(username);
+
+            // Extract ratings from different game modes
+            chessStat.setRapidRating(extractRating(rootNode, "chess_rapid"));
+            chessStat.setBlitzRating(extractRating(rootNode, "chess_blitz"));
+            chessStat.setBulletRating(extractRating(rootNode, "chess_bullet"));
+            chessStat.setPuzzleRating(extractRating(rootNode, "tactics"));
+
+            // Extract game statistics
+            Map<String, Integer> gameStats = extractGameStats(rootNode);
+            chessStat.setWins(gameStats.get("wins"));
+            chessStat.setLosses(gameStats.get("losses"));
+            chessStat.setDraws(gameStats.get("draws"));
+            chessStat.setTotalGames(gameStats.get("totalGames"));
+
+            logger.info("Successfully fetched stats for user: {}", username);
+            return chessStat;
+
         } catch (HttpClientErrorException.NotFound e) {
             logger.error("User not found: {}", username);
             throw new RuntimeException("Chess.com user not found: " + username);
         } catch (Exception e) {
             logger.error("Error fetching chess stats for user: {}", username, e);
-            throw new RuntimeException("Failed to fetch chess statistics: " + e.getMessage());
+            throw new RuntimeException("Failed to fetch chess statistics for user: " + username + ": " + e.getMessage());
         }
-        
-        return stats;
     }
     
     /**
@@ -186,16 +193,22 @@ public class ChessComApiService {
 
         while (retryCount < maxRetries) {
             try {
-                String gamesUrl = String.format("%s%s/games/%d/%02d",
+                String gamesUrl = String.format("%s%s/games/%04d/%02d",
                     CHESS_COM_API_BASE, username, year, month);
-
+                
+                if (gamesUrl == null) {
+                    logger.error("Games URL is null for {}/{}. String formatting error.", year, month);
+                    return null;
+                }
+                
                 logger.info("Fetching games from: {} (attempt {}/{})", gamesUrl, retryCount + 1, maxRetries);
                 String response = restTemplate.getForObject(gamesUrl, String.class);
 
                 if (response != null) {
+                    double responseSizeMB = response.getBytes().length / (1024.0 * 1024.0);
                     JsonNode rootNode = objectMapper.readTree(response);
-                    logger.info("Successfully fetched games for {}/{} - {} games found",
-                        year, month, rootNode.path("games").size());
+                    logger.info("Successfully fetched games for {}/{} - {} games found, response size: {:.2f} MB",
+                        year, month, rootNode.path("games").size(), responseSizeMB);
                     return rootNode;
                 }
 
@@ -205,11 +218,12 @@ public class ChessComApiService {
                     // Exponential backoff: 500ms, 1s, 2s
                     long delayMs = baseDelayMs * (1L << (retryCount - 1));
 
-                    logger.warn("Rate limited (429) for {}/{}. Retry {}/{} after {}ms",
-                        year, month, retryCount, maxRetries, delayMs);
+                    logger.warn("Rate limited (429) for {}/{}.", year, month);
 
                     if (retryCount < maxRetries) {
                         try {
+                            logger.info("Waiting {} ms before retrying. Next attempt: {}/{}...",
+                                delayMs, retryCount + 1, maxRetries);
                             Thread.sleep(delayMs);
                         } catch (InterruptedException ie) {
                             Thread.currentThread().interrupt();

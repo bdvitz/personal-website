@@ -1,7 +1,7 @@
 package com.bdvitz.codingstats.model;
 
 import jakarta.persistence.*;
-import java.time.LocalDateTime;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "chess_stats")
@@ -34,16 +34,16 @@ public class ChessStat {
     private Integer draws;
     
     @Column(name = "last_updated")
-    private LocalDateTime lastUpdated;
+    private LocalDate lastUpdated;
     
     // Constructors
     public ChessStat() {
-        this.lastUpdated = LocalDateTime.now();
+        this.lastUpdated = LocalDate.now();
     }
     
     public ChessStat(String username) {
         this.username = username;
-        this.lastUpdated = LocalDateTime.now();
+        this.lastUpdated = LocalDate.now();
     }
     
     // Getters and Setters
@@ -127,16 +127,16 @@ public class ChessStat {
         this.draws = draws;
     }
     
-    public LocalDateTime getLastUpdated() {
+    public LocalDate getLastUpdated() {
         return lastUpdated;
     }
     
-    public void setLastUpdated(LocalDateTime lastUpdated) {
+    public void setLastUpdated(LocalDate lastUpdated) {
         this.lastUpdated = lastUpdated;
     }
     
     @PreUpdate
     public void preUpdate() {
-        this.lastUpdated = LocalDateTime.now();
+        this.lastUpdated = LocalDate.now();
     }
 }
