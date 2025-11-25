@@ -205,10 +205,9 @@ public class ChessComApiService {
                 String response = restTemplate.getForObject(gamesUrl, String.class);
 
                 if (response != null) {
-                    double responseSizeMB = response.getBytes().length / (1024.0 * 1024.0);
                     JsonNode rootNode = objectMapper.readTree(response);
-                    logger.info("Successfully fetched games for {}/{} - {} games found, response size: {:.2f} MB",
-                        year, month, rootNode.path("games").size(), responseSizeMB);
+                    logger.info("Successfully fetched games for {}/{} - {} games found",
+                        year, month, rootNode.path("games").size());
                     return rootNode;
                 }
 

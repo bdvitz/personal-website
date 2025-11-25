@@ -2,6 +2,7 @@ package com.bdvitz.codingstats.model;
 
 import jakarta.persistence.*;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 
 @Entity
 @Table(name = "daily_ratings", 
@@ -28,7 +29,7 @@ public class ChessDailyRating {
     
     // Constructors
     public ChessDailyRating() {
-        this.date = LocalDate.now();
+        this.date = LocalDate.now(ZoneOffset.UTC);
     }
     
     public ChessDailyRating(String username, LocalDate date) {

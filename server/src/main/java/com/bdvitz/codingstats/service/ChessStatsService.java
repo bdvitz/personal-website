@@ -46,8 +46,13 @@ public class ChessStatsService {
     public ChessStat fetchAndUpdateCurrentStats(String username) {
         ChessStat chessStat = fetchCurrentStats(username);
         logger.info("Updating repository with live stats for user: {}", username);
-        chessStatRepository.save(chessStat);
-        return chessStat;
+        
+        // Preserve existing ID to avoid delete+insert, just update in place
+        chessStatRepository.findByUsername(username).ifPresent(existingChessStat ->
+            chessStat.setId(existingChessStat.getId())
+        );
+
+        return chessStatRepository.save(chessStat);
     }
 
     /**

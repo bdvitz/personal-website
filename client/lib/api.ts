@@ -31,62 +31,28 @@ export const refreshChessStats = async (username: string) => {
   }
 }
 
-// Get historical rating data
-export const getRatingHistory = async (username: string, days: number = 30) => {
+// Get rating history for a single month (checks DB first for stored users, falls back to API)
+export const getMonthHistory = async (username: string, year: number, month: number) => {
   try {
-    const response = await apiClient.get(`/api/chess/stats/history`, { params: { username, days } })
-    return response.data
-  } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to fetch rating history')
-  }
-}
-
-// Get ratings formatted for chart display
-export const getRatingsOverTime = async (username: string, days: number = 90) => {
-  try {
-    const response = await apiClient.get(`/api/chess/stats/ratings-over-time`, { params: { username, days } })
-    return response.data
-  } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to fetch ratings over time')
-  }
-}
-
-// Get ratings for a custom date range
-export const getRatingsByDateRange = async (username: string, startDate: string, endDate: string) => {
-  try {
-    const response = await apiClient.get(`/api/chess/stats/ratings-by-date-range`, {
-      params: { username, startDate, endDate }
+    const response = await apiClient.get(`/api/chess/history/month`, {
+      params: { username, year, month }
     })
     return response.data
   } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to fetch ratings by date range')
+    throw new Error(error.response?.data?.error || 'Failed to fetch month history')
   }
 }
 
-// Import historical game data from Chess.com
-export const importHistoricalData = async (
-  username: string,
-  startYear: number,
-  startMonth: number,
-  endYear: number,
-  endMonth: number
-) => {
+// Fetch rating history for a single month from Chess.com API (guest users)
+export const fetchMonthHistory = async (username: string, year: number, month: number) => {
   try {
-    const params: any = {
-      username,
-      startYear,
-      startMonth,
-      endYear,
-      endMonth
-    }
-
-    const response = await apiClient.post(`/api/chess/stats/import-history`, null, {
-      params,
-      timeout: 600000, // 10 minute timeout for long imports
+    const response = await apiClient.get(`/api/chess/history/guest-month`, {
+      params: { username, year, month },
+      timeout: 30000, // 30 second timeout
     })
     return response.data
   } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to import historical data')
+    throw new Error(error.response?.data?.error || 'Failed to fetch guest month history')
   }
 }
 
@@ -110,52 +76,6 @@ export const getGuestStats = async (username: string) => {
     return response.data
   } catch (error: any) {
     throw new Error(error.response?.data?.error || 'Failed to fetch guest statistics. Unable to connect to server and make api requests.')
-  }
-}
-
-// Fetch guest user historical data for a single month without storing in database
-export const fetchGuestHistoryMonth = async (
-  username: string,
-  year: number,
-  month: number
-) => {
-  try {
-    const response = await apiClient.get(`/api/chess/stats/guest-history-month`, {
-      params: { username, year, month },
-      timeout: 30000, // 30 second timeout for single month
-    })
-    return response.data
-  } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to fetch guest history for month')
-  }
-}
-
-// Fetch guest user historical data without storing in database
-// @deprecated Use fetchGuestHistoryMonth for better memory efficiency
-export const fetchGuestHistory = async (
-  username: string,
-  startYear: number,
-  startMonth: number,
-  endYear?: number,
-  endMonth?: number
-) => {
-  try {
-    const params: any = {
-      username,
-      startYear,
-      startMonth
-    }
-
-    if (endYear !== undefined) params.endYear = endYear
-    if (endMonth !== undefined) params.endMonth = endMonth
-
-    const response = await apiClient.get(`/api/chess/stats/guest-history`, {
-      params,
-      timeout: 600000, // 10 minute timeout for long fetches
-    })
-    return response.data
-  } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to fetch guest history')
   }
 }
 
