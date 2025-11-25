@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useMemo } from 'react'
+import { memo, useMemo, useState, useEffect } from 'react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface RatingChartProps {
@@ -17,6 +17,21 @@ interface RatingChartProps {
 }
 
 const RatingChart = memo(function RatingChart({ data, connectNulls = false }: RatingChartProps) {
+  // Track screen size for responsive design
+  const [isMobile, setIsMobile] = useState(false)
+  const [isTablet, setIsTablet] = useState(false)
+
+  useEffect(() => {
+    const handleResize = () => {
+      setIsMobile(window.innerWidth < 640)
+      setIsTablet(window.innerWidth >= 640 && window.innerWidth < 1024)
+    }
+
+    handleResize()
+    window.addEventListener('resize', handleResize)
+    return () => window.removeEventListener('resize', handleResize)
+  }, [])
+
   // Transform backend data to Recharts format - memoized to prevent recalculation
   const chartData = useMemo(() => {
     return data.labels.map((label, index) => {
@@ -84,10 +99,12 @@ const RatingChart = memo(function RatingChart({ data, connectNulls = false }: Ra
     if (!active || !payload?.length) return null
 
     return (
-      <div className="bg-gray-900/95 backdrop-blur-lg border border-white/20 rounded-lg p-4 shadow-xl">
-        <p className="text-white font-semibold mb-2">{label}</p>
+      <div className={`bg-gray-900/95 backdrop-blur-lg border border-white/20 rounded-lg shadow-xl ${
+        isMobile ? 'p-2' : 'p-4'
+      }`}>
+        <p className={`text-white font-semibold mb-1 ${isMobile ? 'text-xs' : 'text-sm'}`}>{label}</p>
         {payload.map((entry: any, index: number) => (
-          <p key={index} className="text-sm" style={{ color: entry.color }}>
+          <p key={index} className={isMobile ? 'text-xs' : 'text-sm'} style={{ color: entry.color }}>
             {entry.name}: <span className="font-bold">{entry.value}</span>
           </p>
         ))}
@@ -95,35 +112,83 @@ const RatingChart = memo(function RatingChart({ data, connectNulls = false }: Ra
     )
   }
 
+  // Responsive configuration based on screen size
+  const chartConfig = useMemo(() => {
+    if (isMobile) {
+      return {
+        height: 300,
+        margin: { top: 5, right: 5, left: 0, bottom: 40 },
+        fontSize: 10,
+        tickAngle: -45,
+        xAxisHeight: 60,
+        strokeWidth: 1.5,
+        dotRadius: 2,
+        activeDotRadius: 4,
+        legendFontSize: 11
+      }
+    } else if (isTablet) {
+      return {
+        height: 350,
+        margin: { top: 5, right: 15, left: 5, bottom: 50 },
+        fontSize: 11,
+        tickAngle: -45,
+        xAxisHeight: 70,
+        strokeWidth: 2,
+        dotRadius: 2.5,
+        activeDotRadius: 5,
+        legendFontSize: 12
+      }
+    } else {
+      // Desktop - original settings (no font size override, let Recharts use defaults)
+      return {
+        height: 400,
+        margin: { top: 5, right: 30, left: 20, bottom: 60 },
+        fontSize: undefined, // Use Recharts default (larger)
+        tickAngle: -45,
+        xAxisHeight: 80,
+        strokeWidth: 2,
+        dotRadius: 3,
+        activeDotRadius: 6,
+        legendFontSize: undefined // Use default (larger)
+      }
+    }
+  }, [isMobile, isTablet])
+
   return (
-    <ResponsiveContainer width="100%" height={400}>
-      <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 60 }}>
+    <ResponsiveContainer width="100%" height={chartConfig.height}>
+      <LineChart data={chartData} margin={chartConfig.margin}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
         <XAxis
           dataKey="date"
           stroke="rgba(255,255,255,0.5)"
-          tick={{ fill: 'rgba(255,255,255,0.7)' } as any}
-          angle={-45}
+          tick={{ fill: 'rgba(255,255,255,0.7)', ...(chartConfig.fontSize && { fontSize: chartConfig.fontSize }) } as any}
+          angle={chartConfig.tickAngle}
           textAnchor="end"
-          height={80}
+          height={chartConfig.xAxisHeight}
           tickFormatter={formatDate}
+          interval={isMobile ? 'preserveStartEnd' : 'preserveEnd'}
         />
         <YAxis
           stroke="rgba(255,255,255,0.5)"
-          tick={{ fill: 'rgba(255,255,255,0.7)' }}
+          tick={{ fill: 'rgba(255,255,255,0.7)', ...(chartConfig.fontSize && { fontSize: chartConfig.fontSize }) }}
           domain={[yAxisMin, yAxisMax]}
+          width={isMobile ? 40 : 60}
         />
         <Tooltip content={<CustomTooltip />} />
-        <Legend wrapperStyle={{ color: 'white' }} iconType="line" />
+        <Legend
+          wrapperStyle={{ color: 'white', ...(chartConfig.legendFontSize && { fontSize: chartConfig.legendFontSize }) }}
+          iconType="line"
+          iconSize={isMobile ? 12 : 14}
+        />
         {data.datasets.map((dataset, index) => (
           <Line
             key={index}
             type="monotone"
             dataKey={dataset.label}
             stroke={dataset.borderColor}
-            strokeWidth={2}
-            dot={{ r: 3 }}
-            activeDot={{ r: 6 }}
+            strokeWidth={chartConfig.strokeWidth}
+            dot={{ r: chartConfig.dotRadius }}
+            activeDot={{ r: chartConfig.activeDotRadius }}
             connectNulls={connectNulls}
           />
         ))}
