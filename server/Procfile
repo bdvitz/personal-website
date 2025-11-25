@@ -1,1 +1,1 @@
-web: java -Xmx256m -Xms128m -XX:MaxMetaspaceSize=128m -XX:MetaspaceSize=64m -XX:+UseG1GC -XX:MaxGCPauseMillis=100 -XX:+UseStringDeduplication -Djava.security.egd=file:/dev/./urandom -jar target/*.jar
+web: java -Xmx350m -Xms150m -XX:MaxMetaspaceSize=90m -XX:MetaspaceSize=64m -XX:+UseSerialGC -XX:MinHeapFreeRatio=20 -XX:MaxHeapFreeRatio=40 -XX:GCTimeRatio=4 -XX:AdaptiveSizePolicyWeight=90 -Djava.security.egd=file:/dev/./urandom -jar target/*.jar
