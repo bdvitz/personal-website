@@ -79,4 +79,29 @@ export const getGuestStats = async (username: string) => {
   }
 }
 
+// Load stored user snapshot from static JSON file
+export const loadStoredUserSnapshot = async () => {
+  try {
+    const response = await fetch('/data/stored-user-snapshot.json')
+    if (!response.ok) {
+      throw new Error('Snapshot file not found')
+    }
+    return await response.json()
+  } catch (error: any) {
+    console.error('Failed to load snapshot:', error)
+    throw new Error('Failed to load cached data')
+  }
+}
+
+// Check server health with timeout
+export const checkServerHealth = async (timeoutMs: number = 5000): Promise<boolean> => {
+  try {
+    const response = await apiClient.get('/api/chess/stats/health', { timeout: timeoutMs })
+    return response.status === 200
+  } catch (error: any) {
+    console.warn('Server health check failed:', error.message)
+    return false
+  }
+}
+
 export default apiClient

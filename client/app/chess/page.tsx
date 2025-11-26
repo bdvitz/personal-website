@@ -5,7 +5,7 @@ import { Trophy, TrendingUp, RefreshCw, Target, Zap, Clock, User, Search, Calend
 import RatingChart from '@/components/RatingChart'
 import StatsCard from '@/components/StatsCard'
 import WinLossChart from '@/components/WinLossChart'
-import { getChessStats, getGuestStats, refreshChessStats, getMonthHistory, fetchMonthHistory, verifyChessComUser } from '@/lib/api'
+import { getChessStats, getGuestStats, refreshChessStats, getMonthHistory, fetchMonthHistory, verifyChessComUser, loadStoredUserSnapshot, checkServerHealth } from '@/lib/api'
 
 interface ChessStats {
   username: string
@@ -77,6 +77,10 @@ export default function ChessPage() {
     total: number
     currentMonth: string
   } | null>(null)
+
+  // Server health status for stored user
+  const [serverOnline, setServerOnline] = useState<boolean | null>(null) // null = checking, true = online, false = offline
+  const [usingSnapshot, setUsingSnapshot] = useState(false)
 
   // Helper function to calculate date range based on time option
   const calculateDateRange = (option: string, customStart?: { year: number; month: number }, customEnd?: { year: number; month: number }): { startDate: Date; endDate: Date } => {
@@ -379,8 +383,19 @@ export default function ChessPage() {
         ? await refreshChessStats(username)
         : await getGuestStats(username)
       setStats(statsData)
+
+      // If successful and stored user, mark server as online and not using snapshot
+      if (userMode === 'stored') {
+        setServerOnline(true)
+        setUsingSnapshot(false)
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to refresh stats')
+
+      // If failed and stored user, mark server as potentially offline
+      if (userMode === 'stored') {
+        setServerOnline(false)
+      }
     } finally {
       setRefreshing(false)
     }
@@ -389,7 +404,25 @@ export default function ChessPage() {
   // Refresh historical data
   const handleRefresh = async () => {
     setRefreshing(true)
+
+    // Check server health before fetching
+    if (userMode === 'stored') {
+      const isOnline = await checkServerHealth(5000)
+      setServerOnline(isOnline)
+
+      if (!isOnline) {
+        setError('Server is offline. Please wait and try again.')
+        setRefreshing(false)
+        return
+      }
+    }
+
     await fetchData(true)
+
+    // Mark that we're using live data if successful
+    if (userMode === 'stored') {
+      setUsingSnapshot(false)
+    }
   }
 
   // Initial load
@@ -397,9 +430,44 @@ export default function ChessPage() {
     if (userMode === 'stored') {
       const loadInitialStats = async () => {
         try {
-          const statsData = await getChessStats(DEFAULT_USERNAME)
-          setStats(statsData)
-          setLoading(false)
+          // First, try to load snapshot data (instant)
+          try {
+            const snapshot = await loadStoredUserSnapshot()
+            if (snapshot && snapshot.currentStats) {
+              setStats(snapshot.currentStats)
+              setUsingSnapshot(true)
+              setLoading(false)
+              console.log('Loaded snapshot data:', snapshot.generatedAt)
+            }
+          } catch (snapshotErr) {
+            console.warn('Snapshot not available, will try server')
+          }
+
+          // Then check server health in background
+          const isOnline = await checkServerHealth(5000)
+          setServerOnline(isOnline)
+
+          if (isOnline) {
+            // Server is online, fetch fresh data
+            try {
+              const statsData = await getChessStats(DEFAULT_USERNAME)
+              setStats(statsData)
+              setUsingSnapshot(false)
+              setLoading(false)
+            } catch (err: any) {
+              // Server responded but failed, keep snapshot data if available
+              if (!usingSnapshot) {
+                setError(err.message || 'Failed to load stats')
+              }
+              setLoading(false)
+            }
+          } else {
+            // Server offline, rely on snapshot
+            if (!usingSnapshot) {
+              setError('Server is offline. Please try again later.')
+            }
+            setLoading(false)
+          }
         } catch (err: any) {
           setError(err.message || 'Failed to load stats')
           setLoading(false)
@@ -565,6 +633,37 @@ export default function ChessPage() {
             </p>
             <p className="text-green-200 text-sm mt-1">
               You can now retrieve their chess statistics.
+            </p>
+          </div>
+        )}
+
+        {/* Server Status Notice for Stored User */}
+        {userMode === 'stored' && serverOnline === false && (
+          <div className="mt-4 bg-yellow-500/20 border border-yellow-400/50 rounded-lg p-4">
+            <p className="text-yellow-200 font-semibold mb-2">⚠️ Server Status: Waking Up</p>
+            <p className="text-yellow-100 text-sm">
+              The backend server is currently sleeping and may take <strong>up to 2 minutes</strong> to come online.
+              {usingSnapshot && ' You are currently viewing cached data from the last snapshot.'}
+            </p>
+            <p className="text-yellow-100 text-sm mt-2">
+              Click "Refresh Stats" or "Retrieve Historical Data" to fetch live data once the server is online.
+            </p>
+          </div>
+        )}
+
+        {userMode === 'stored' && usingSnapshot && serverOnline === true && (
+          <div className="mt-4 bg-blue-500/20 border border-blue-400/50 rounded-lg p-4">
+            <p className="text-blue-200 font-semibold mb-1">📸 Viewing Cached Data</p>
+            <p className="text-blue-100 text-sm">
+              You're viewing snapshot data. Click "Refresh Stats" to fetch the latest data from the server.
+            </p>
+          </div>
+        )}
+
+        {userMode === 'stored' && serverOnline === true && !usingSnapshot && (
+          <div className="mt-4 bg-green-500/20 border border-green-400/50 rounded-lg p-4">
+            <p className="text-green-200">
+              ✓ Server online - Showing live data
             </p>
           </div>
         )}
