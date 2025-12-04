@@ -56,16 +56,31 @@ export const fetchMonthHistory = async (username: string, year: number, month: n
   }
 }
 
-// Verify Chess.com user exists
+// Fetch and update rating history from Chess.com API to database (stored users)
+export const refreshMonthHistory = async (username: string, year: number, month: number) => {
+  try {
+    const response = await apiClient.post(`/api/chess/history/refresh`, null, {
+      params: { username, year, month },
+      timeout: 30000, // 30 second timeout for API fetch
+    })
+    return response.data
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || 'Failed to refresh month history from Chess.com')
+  }
+}
+
+// Verify Chess.com user exists via server endpoint
 export const verifyChessComUser = async (username: string) => {
   try {
-    const response = await axios.get(`https://api.chess.com/pub/player/${username}`)
-    return { exists: true, data: response.data }
-  } catch (error: any) {
-    if (error.response?.data?.code === 0) {
-      return { exists: false, message: error.response.data.message }
+    const response = await apiClient.get(`/api/chess/stats/verify`, { params: { username } })
+    return {
+      exists: response.data.exists,
+      username: response.data.username,
+      joinedTimestamp: response.data.joinedTimestamp,
+      message: response.data.message
     }
-    throw new Error('Failed to verify user')
+  } catch (error: any) {
+    throw new Error(error.response?.data?.error || 'Failed to verify user')
   }
 }
 

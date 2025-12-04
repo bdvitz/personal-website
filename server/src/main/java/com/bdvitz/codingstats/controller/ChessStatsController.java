@@ -78,6 +78,35 @@ public class ChessStatsController {
     }
 
     /**
+     * Verify if a Chess.com user exists and get account creation date
+     * GET /api/chess/stats/verify?username=example
+     */
+    @GetMapping("/verify")
+    public ResponseEntity<?> verifyUser(@RequestParam String username) {
+        try {
+            logger.info("Verifying Chess.com user: {}", username);
+            var userInfo = chessStatsService.verifyUserExists(username);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("exists", userInfo.isExists());
+            response.put("username", userInfo.getUsername());
+            response.put("joinedTimestamp", userInfo.getJoinedTimestamp());
+
+            if (!userInfo.isExists()) {
+                response.put("message", "User not found on Chess.com");
+            } else {
+                response.put("message", null);
+            }
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error verifying user", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to verify user"));
+        }
+    }
+
+    /**
      * Health check endpoint
      * GET /api/chess/stats/health
      */

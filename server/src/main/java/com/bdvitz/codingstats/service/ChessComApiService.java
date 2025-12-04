@@ -1,6 +1,7 @@
 package com.bdvitz.codingstats.service;
 
 import com.bdvitz.codingstats.model.ChessStat;
+import com.bdvitz.codingstats.model.UserVerificationResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -135,18 +136,31 @@ public class ChessComApiService {
     }
     
     /**
-     * Verify if a Chess.com user exists
+     * Get Chess.com user information including account creation date
      */
-    public boolean userExists(String username) {
+    public UserVerificationResponse getUserInfo(String username) {
+        logger.info("Fetching user info for: {}", username);
         try {
             String userUrl = CHESS_COM_API_BASE + username;
-            restTemplate.getForObject(userUrl, String.class);
-            return true;
+            String response = restTemplate.getForObject(userUrl, String.class);
+
+            if (response != null) {
+                JsonNode rootNode = objectMapper.readTree(response);
+                Long joinedTimestamp = rootNode.path("joined").asLong(0);
+
+                logger.info("User {} exists, joined timestamp: {}", username, joinedTimestamp);
+                return new UserVerificationResponse(true, username, joinedTimestamp);
+            }
+
+            // Response was null
+            logger.warn("Received null response for user: {}", username);
+            return new UserVerificationResponse(false, username);
         } catch (HttpClientErrorException.NotFound e) {
-            return false;
+            logger.info("User not found: {}", username);
+            return new UserVerificationResponse(false, username);
         } catch (Exception e) {
             logger.error("Error checking if user exists: {}", username, e);
-            return false;
+            return new UserVerificationResponse(false, username);
         }
     }
 

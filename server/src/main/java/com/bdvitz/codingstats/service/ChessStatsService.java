@@ -1,6 +1,7 @@
 package com.bdvitz.codingstats.service;
 
 import com.bdvitz.codingstats.model.ChessStat;
+import com.bdvitz.codingstats.model.UserVerificationResponse;
 import com.bdvitz.codingstats.repository.ChessStatRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -62,6 +63,13 @@ public class ChessStatsService {
         logger.info("Fetching live chess.com api stats for user: {}", username);
         // Fetch stats from Chess.com API
         return chessComApiService.fetchChessStats(username);
+    }
+
+    /**
+     * Verify if a user exists on Chess.com and get account creation date
+     */
+    public UserVerificationResponse verifyUserExists(String username) {
+        return chessComApiService.getUserInfo(username);
     }
 
 }
