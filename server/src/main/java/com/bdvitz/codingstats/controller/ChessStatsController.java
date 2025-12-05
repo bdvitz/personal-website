@@ -91,16 +91,30 @@ public class ChessStatsController {
             response.put("exists", userInfo.isExists());
             response.put("username", userInfo.getUsername());
             response.put("joinedTimestamp", userInfo.getJoinedTimestamp());
-
-            if (!userInfo.isExists()) {
-                response.put("message", "User not found on Chess.com");
-            } else {
-                response.put("message", null);
-            }
+            response.put("message", null);
 
             return ResponseEntity.ok(response);
+        } catch (org.springframework.web.client.HttpClientErrorException.NotFound e) {
+            // User doesn't exist on Chess.com - return 404
+            logger.info("User not found: {}", username);
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", "User does not exist on Chess.com"));
+        } catch (RuntimeException e) {
+            // Check if it's a service unavailability issue (timeout, network error)
+            if (e.getMessage() != null &&
+                (e.getMessage().contains("unavailable") ||
+                 e.getMessage().contains("timeout") ||
+                 e.getMessage().contains("null response"))) {
+                logger.error("Chess.com API unavailable for user: {}", username, e);
+                return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE)
+                        .body(Map.of("error", "Server is currently offline"));
+            }
+            // Other runtime exceptions - return 500
+            logger.error("Error verifying user: {}", username, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to verify user"));
         } catch (Exception e) {
-            logger.error("Error verifying user", e);
+            logger.error("Unexpected error verifying user: {}", username, e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to verify user"));
         }

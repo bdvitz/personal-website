@@ -535,7 +535,7 @@ export default function ChessPage() {
             <ul className="list-disc list-inside space-y-1 ml-2 mb-3">
               <li>First, verify your Chess.com username using the button above</li>
               <li>Select your desired time range below</li>
-              <li>Click "Retrieve Historical Data" to fetch chess history</li>
+              <li>Click "Update Rating from Chess.com" to fetch chess history</li>
             </ul>
             <p className="text-xs text-purple-200 italic">Note: This takes about 5 to 10 seconds per year of data to respect Chess.com's API rate limiting</p>
           </div>
@@ -821,10 +821,10 @@ export default function ChessPage() {
           <div className="text-center py-12">
             <p className="text-purple-200">
               {userMode === 'guest' && guestUsername
-                ? 'Select a time range above and click "Retrieve Historical Data" to fetch chess history.'
+                ? 'Select a time range above and click "Update Rating from Chess.com" to fetch chess history.'
                 : userMode === 'guest'
                 ? 'Enter a Chess.com username above to get started.'
-                : 'No historical data available yet. Click "Retrieve Historical Data" to fetch chess history.'}
+                : 'No historical data available yet. Click "Update Rating from Chess.com" to fetch chess history.'}
             </p>
           </div>
         )}

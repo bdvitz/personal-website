@@ -72,7 +72,10 @@ export const refreshMonthHistory = async (username: string, year: number, month:
 // Verify Chess.com user exists via server endpoint
 export const verifyChessComUser = async (username: string) => {
   try {
-    const response = await apiClient.get(`/api/chess/stats/verify`, { params: { username } })
+    const response = await apiClient.get(`/api/chess/stats/verify`, {
+      params: { username },
+      timeout: 2000 // 2 second timeout
+    })
     return {
       exists: response.data.exists,
       username: response.data.username,
@@ -80,6 +83,22 @@ export const verifyChessComUser = async (username: string) => {
       message: response.data.message
     }
   } catch (error: any) {
+    // Check if it's a timeout or network error (server offline)
+    if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || !error.response) {
+      throw new Error('Server is currently offline. Please try again later.')
+    }
+
+    // Check if user doesn't exist (404)
+    if (error.response?.status === 404) {
+      throw new Error(`User '${username}' does not exist on Chess.com`)
+    }
+
+    // Check if service is unavailable (503)
+    if (error.response?.status === 503) {
+      throw new Error('Server is currently offline. Please try again later.')
+    }
+
+    // Generic error for other cases
     throw new Error(error.response?.data?.error || 'Failed to verify user')
   }
 }

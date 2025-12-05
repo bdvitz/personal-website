@@ -28,8 +28,8 @@ public class ChessComApiService {
     public ChessComApiService() {
         // Configure RestTemplate with timeouts to prevent infinite hangs
         SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-        factory.setConnectTimeout(5000);  // 5 seconds to establish connection
-        factory.setReadTimeout(10000);     // 10 seconds to read response
+        factory.setConnectTimeout(2000);  // 2 seconds to establish connection
+        factory.setReadTimeout(2000);     // 2 seconds to read response
         this.restTemplate = new RestTemplate(factory);
         this.objectMapper = new ObjectMapper();
     }
@@ -137,6 +137,8 @@ public class ChessComApiService {
     
     /**
      * Get Chess.com user information including account creation date
+     * @throws HttpClientErrorException.NotFound if user doesn't exist
+     * @throws RuntimeException if Chess.com API is unreachable or timeout occurs
      */
     public UserVerificationResponse getUserInfo(String username) {
         logger.info("Fetching user info for: {}", username);
@@ -152,15 +154,19 @@ public class ChessComApiService {
                 return new UserVerificationResponse(true, username, joinedTimestamp);
             }
 
-            // Response was null
+            // Response was null - treat as service unavailable
             logger.warn("Received null response for user: {}", username);
-            return new UserVerificationResponse(false, username);
+            throw new RuntimeException("Chess.com API returned null response");
         } catch (HttpClientErrorException.NotFound e) {
             logger.info("User not found: {}", username);
-            return new UserVerificationResponse(false, username);
+            throw e; // Re-throw to be handled by controller
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            // Network timeout or connection error
+            logger.error("Network error or timeout checking user: {}", username, e);
+            throw new RuntimeException("Chess.com API is currently unavailable", e);
         } catch (Exception e) {
             logger.error("Error checking if user exists: {}", username, e);
-            return new UserVerificationResponse(false, username);
+            throw new RuntimeException("Failed to verify user with Chess.com API", e);
         }
     }
 
