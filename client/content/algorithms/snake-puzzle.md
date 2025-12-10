@@ -80,7 +80,7 @@ The next 9 block are positions according to the solution configuration.
 
 The final view shows the fully assembled cube, demonstrating how all blocks fit together perfectly:
 
-![Red snake cube soluiton - complete assembled snake cube](/algorithms/red_solved_04.png "w:350")
+![Red snake cube solution - complete assembled snake cube](/algorithms/red_solved_04.png "w:350")
 
 This configuration represents one of the valid Hamiltonian paths through the 3×3×3 grid that satisfies all the constraint conditions defined by the snake's physical structure.
 
@@ -234,6 +234,18 @@ Therefore, the worst-case time complexity is **$O(5^k)$** as we potentially try 
 ## Visualization
 
 Results from the python script are presented below in the form of images or GIFs. There are GIFs provided for puzzles that have multiple asymmetric solutions (blue and orange).
+
+12 Solutions for the blue snake cube with constraints `"SCCCCSCSCCCCCCCCCCCSCSCCCCS"`
+![blue snake cube python solution gif](/algorithms/blue_3x3x3_solutions.gif "w:350")
+
+1 Solution for the green snake cube with constraints `"SSCCCSCCSCCCSCSCCCCSCSCSCSS"`
+![green snake cube python solution plot](/algorithms/green_3x3x3_solution.png "w:350")
+
+10 Solutions for the orange snake cube with constraints `"SSCCCCCCCCCSCCCCCCCSCSCCCCS"`
+![orange snake cube python solution gif](/algorithms/orange_3x3x3_solutions.gif "w:350")
+
+1 Solution for the brown snake cube with constraints `"CSCCSCCCSSCCSCCSCCSCCCCCCCCCSCSCCCCCCSCSSCCCCSSCCSCCCCCCCCCCSSCC"`
+![brown 4x4x4 snake cube python solution plot](/algorithms/brown_4x4x4_solution.png "w:350")
 
 ## Conclusion
 
