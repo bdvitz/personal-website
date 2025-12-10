@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { Code, Blocks, BookOpen, Trophy, Home, Menu, X } from 'lucide-react'
+import { Code, Blocks, Trophy, Home, Menu, X } from 'lucide-react'
 
 export default function Navigation() {
   const pathname = usePathname()
@@ -11,8 +11,7 @@ export default function Navigation() {
 
   const navItems = [
     { href: '/', label: 'Home', icon: Home, gradient: 'from-purple-500 to-purple-600' },
-    { href: '/leetcode', label: 'LeetCode', icon: Code, gradient: 'from-green-500 to-green-600' },
-    { href: '/project-euler', label: 'Project Euler', icon: BookOpen, gradient: 'from-blue-500 to-blue-600' },
+    { href: '/algorithms', label: 'Algorithms', icon: Code, gradient: 'from-green-500 to-green-600' },
     { href: '/chess', label: 'Chess', icon: Trophy, gradient: 'from-yellow-500 to-yellow-600' },
     { href: '/cubing', label: "Cubing", icon: Blocks, gradient: 'from-red-500 to-red-600' }
   ]

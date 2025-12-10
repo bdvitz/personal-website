@@ -1,0 +1,74 @@
+---
+title: "Binary Search Implementation"
+category: "puzzles"
+difficulty: "Medium"
+tags: ["Search", "Algorithm", "Divide and Conquer"]
+date: "2024-01-20"
+excerpt: "Efficiently find a target value in a sorted array by repeatedly dividing the search interval in half."
+---
+
+## Overview
+
+Binary search is one of the most fundamental algorithms in computer science. It efficiently finds a target value in a sorted array by repeatedly dividing the search interval in half.
+
+## Algorithm
+
+```javascript
+function binarySearch(arr, target) {
+    let left = 0;
+    let right = arr.length - 1;
+
+    while (left <= right) {
+        const mid = Math.floor((left + right) / 2);
+
+        if (arr[mid] === target) {
+            return mid;
+        } else if (arr[mid] < target) {
+            left = mid + 1;
+        } else {
+            right = mid - 1;
+        }
+    }
+
+    return -1; // Target not found
+}
+```
+
+## Recursive Implementation
+
+```javascript
+function binarySearchRecursive(arr, target, left = 0, right = arr.length - 1) {
+    if (left > right) {
+        return -1;
+    }
+
+    const mid = Math.floor((left + right) / 2);
+
+    if (arr[mid] === target) {
+        return mid;
+    } else if (arr[mid] < target) {
+        return binarySearchRecursive(arr, target, mid + 1, right);
+    } else {
+        return binarySearchRecursive(arr, target, left, mid - 1);
+    }
+}
+```
+
+## Complexity Analysis
+
+- **Time Complexity**: O(log n) - We halve the search space in each iteration
+- **Space Complexity**:
+  - Iterative: O(1)
+  - Recursive: O(log n) due to call stack
+
+## Common Variations
+
+1. **Find First Occurrence**: Modify to continue searching left even after finding target
+2. **Find Last Occurrence**: Continue searching right after finding target
+3. **Find Insert Position**: Return the position where target should be inserted
+
+## Key Points
+
+- Array **must be sorted** for binary search to work
+- Very efficient for large datasets
+- Foundation for many other algorithms (merge sort, quicksort partitioning, etc.)

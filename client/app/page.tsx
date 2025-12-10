@@ -1,4 +1,4 @@
-import { Code, Blocks, BookOpen, Trophy } from 'lucide-react'
+import { Code, Blocks, Trophy } from 'lucide-react'
 import Link from 'next/link'
 
 export default function Home() {
@@ -15,28 +15,15 @@ export default function Home() {
 
       {/* Main feature cards */}
       <div className="grid md:grid-cols-2 gap-8">
-        <Link href="/leetcode">
+        <Link href="/algorithms">
           <div className="card card-hover group cursor-pointer">
             <Code className="w-16 h-16 text-green-400 mb-4 group-hover:scale-110 transition-transform duration-300" />
-            <h2 className="text-3xl font-bold text-white mb-3">LeetCode</h2>
+            <h2 className="text-3xl font-bold text-white mb-3">Algorithms</h2>
             <p className="text-purple-200 leading-relaxed">
-              Detailed solutions to coding problems with explanations and complexity & space analysis
+              Detailed solutions to LeetCode problems, Project Euler challenges, and interesting algorithmic puzzles with explanations and analysis
             </p>
             <div className="mt-6 inline-flex items-center text-green-400 font-semibold group-hover:translate-x-2 transition-transform duration-200">
               View Solutions →
-            </div>
-          </div>
-        </Link>
-
-        <Link href="/project-euler">
-          <div className="card card-hover group cursor-pointer">
-            <BookOpen className="w-16 h-16 text-blue-400 mb-4 group-hover:scale-110 transition-transform duration-300" />
-            <h2 className="text-3xl font-bold text-white mb-3">Project Euler</h2>
-            <p className="text-purple-200 leading-relaxed">
-              Mathematical programming challenges solved algorithms and clear LaTeX formulas
-            </p>
-            <div className="mt-6 inline-flex items-center text-blue-400 font-semibold group-hover:translate-x-2 transition-transform duration-200">
-              View Problems →
             </div>
           </div>
         </Link>
@@ -77,8 +64,7 @@ export default function Home() {
             This website is a personal collection of my programming journey, featuring:
           </p>
           <ul className="list-disc list-inside space-y-2 ml-4">
-            <li>LeetCode problem solutions with detailed explanations</li>
-            <li>Project Euler mathematical coding challenges</li>
+            <li>Algorithm solutions including LeetCode and Project Euler challenges</li>
             <li>Refreshable Chess.com statistics tracking using Railway PostgreSQL</li>
             <li>Rubik's Cube hobby and art mosaics</li>
           </ul>

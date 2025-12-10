@@ -1,0 +1,454 @@
+from collections import defaultdict
+from typing import Dict, List, Tuple, Optional
+import time
+
+class SnakeCubeSolver:
+    def __init__(self, constraints: str = '',
+                 path: List[tuple[int, int, int]] = None,
+                 early_stop: bool = True):
+        """
+        Initialize the snake cube solver.
+        Args:
+            constraints: String of 'S' (straight) or 'C' (corner) for each block.
+                Must be a perfect cube length.
+        """
+        self.directions_map = self._generate_directions_map()
+        self.reset_with_constraints(constraints, path)
+        self.early_stop = early_stop
+        
+    def reset_with_constraints(self, new_constraints: str,
+                               new_path: List[Tuple[int, int, int]] = None):
+        """Update constraints and reset cube and path.
+        Args:
+            new_constraints: String of 'S' (straight) or 'C' (corner) for each block. 
+                Must be a perfect cube length 
+                and length less than 256 for bytearray representation.
+            new_path: Optional new path to reset to. If None, defaults to [(0,0,0)].
+        """
+        # validate constraints length
+        n = len(new_constraints)
+        self.size = round(n ** (1/3))
+        if n != self.size ** 3:
+            raise ValueError("Constraints length must be a perfect cube.")
+        self.size_cubed = self.size ** 3
+        
+        # initialize constraints, cube and path
+        self.constraints = new_constraints
+        self.reset_with_path(new_path)  # default starting position
+        self.solutions = []
+
+    def reset_with_path(self, new_path: List[Tuple[int, int, int]] = None):
+        """Reset the cube and path to a new path. Do not change solutions or constraints.
+        Args:
+            new_path: List of (x, y, z) tuples representing the path.
+        """
+        if self.size == 0:
+            if new_path is not None and len(new_path) > 0:
+                raise ValueError("Cannot set a path for a cube of size 0.")
+            self.cube = []
+            self.path = []
+            return
+        self.cube = [[[0]*self.size for _ in range(self.size)] for _ in range(self.size)]
+        self.path = [(0, 0, 0)] if new_path is None else new_path[:]
+        for depth, (x, y, z) in enumerate(self.path):
+            if not self.is_valid_position((x, y, z)):
+                raise ValueError(f"Position {(x, y, z)} in path is invalid or already occupied.")
+            # Calculate the direction from the previous block
+            if depth > 0:
+                prev_direction = self.calculate_previous_direction(depth=depth)
+                allowed_directions = self.directions_map[self.constraints[depth - 1], prev_direction]
+                direction = x - self.path[depth - 1][0], y - self.path[depth - 1][1], z - self.path[depth - 1][2]
+                if direction not in allowed_directions:
+                    raise ValueError(f"Move to {(x, y, z)} at depth {depth} is invalid based on constraints.")
+            self.cube[x][y][z] = depth + 1  # Mark the cube with block number
+    
+    def _generate_directions_map(self) -> Dict[str, List[Tuple[int, int, int]]]:
+        """Generate directions map for straight and corner moves.
+        Returns:
+            A dictionary mapping ('S' or 'C', direction) to the corresponding list of valid vectors."""
+        directions_map = defaultdict(list)
+        all_directions = list(zip([1,-1,0,0,0,0], [0,0,1,-1,0,0], [0,0,0,0,1,-1]))
+        # All possible directions for no previous direction
+        directions_map['S', None].extend(all_directions)
+        directions_map['C', None].extend(all_directions)
+        for dir1 in all_directions:
+            # Straight moves
+            directions_map['S', dir1].append(dir1)
+            # Corner moves
+            for dir2 in all_directions:
+                if dir1 != dir2 and dir1 != tuple(-d for d in dir2):
+                    directions_map['C', dir1].append(dir2)
+        return directions_map
+    
+    def is_valid_position(self, pos: Tuple[int, int, int]) -> bool:
+        """Check if position is within cube bounds and unoccupied."""
+        x, y, z = pos
+        return (0 <= x < self.size and 0 <= y < self.size and 0 <= z < self.size) \
+                and self.cube[x][y][z] == 0
+
+    def calculate_previous_direction(self, depth: int) -> Tuple[int, int, int]:
+        """Calculate the direction vector from the last two positions in
+        the path from the specified depth."""
+        # if depth is None: depth = len(self.path) - 1
+        if depth < 2:
+            return None
+        x1, y1, z1 = self.path[depth - 2]
+        x2, y2, z2 = self.path[depth - 1]
+        return (x2 - x1, y2 - y1, z2 - z1)
+     
+    def solve(self, 
+              depth: int,
+              position: Tuple[int, int, int],
+              prev_direction: Tuple[int, int, int] = None) -> bool:
+        """
+        Recursive backtracking solver for snake cube puzzle using depth-first search.
+        Limits search based on constraints representing the shape of the snake.
+
+        Args:
+            depth: Current depth in the recursion (block number)
+            position: Current position in the cube
+            prev_direction: Direction of the previous move
+
+        Returns:
+            True if a solution is found, False otherwise
+            
+        Class Attributes Used:
+            self.directions_map: Dict mapping (constraint_type, prev_direction) to
+                                 list of precomputed valid directions
+            self.constraints: String of 'S' and 'C' defining the instance of the puzzle
+            self.cube: 3D list representing the cube state, with 0 for unoccupied
+                       and block numbers for occupied
+            self.path: Current path of positions taken, list of (x, y, z) tuples
+            self.solutions: List to store all found solutions
+            self.size: Size of one edge of the cube
+            self.size_cubed: Total number of blocks in the cube (size^3)
+            self.early_stop: Boolean flag to stop after finding the first solution
+        """
+        # Base case: all blocks placed
+        if depth == self.size_cubed:
+            self.solutions.append(self.path[:])
+            return True
+        
+        # Try each direction
+        for dx, dy, dz in self.directions_map[self.constraints[depth - 1], prev_direction]:
+            
+            # Calculate next position
+            x, y, z = position[0] + dx, position[1] + dy, position[2] + dz
+            
+            # Check if next position is inside the bounds and unoccupied
+            if not (0 <= x < self.size and 0 <= y < self.size and 0 <= z < self.size) or \
+                self.cube[x][y][z] > 0:
+                continue
+            
+            # Mark the cube position and append to path
+            self.cube[x][y][z] = depth
+            self.path.append((x, y, z))
+
+            # Recursively try this direction
+            self.solve(depth + 1, (x, y, z), (dx, dy, dz))
+            if self.early_stop and self.solutions:
+                return True
+            
+            # Backtrack the occupied position and path
+            self.cube[x][y][z] = 0
+            self.path.pop()
+
+        return len(self.solutions) > 0
+
+    def display_solutions_path(self):
+        """Display all of the valid solutions in formatted path."""
+        print(f"Total solutions found: {len(self.solutions)}")
+        for sol_num, solution in enumerate(self.solutions, start=1):
+            print(f"Solution {sol_num}:")
+            result = list('(' + ','.join(str(num) for num in coords) + ')' for coords in solution)
+            # print 9 items in the list per line for 3x3x3, 8 for anything else
+            k = 9 if self.size == 3 else 8
+            for i in range(0, len(result), k):
+                print(', '.join(result[i:i+k]))
+    
+    def display_solutions_grid(self):
+        """Display all of the valid solutions in grid format."""
+        print(f"Total solutions found: {len(self.solutions)}")
+        for sol_num, solution in enumerate(self.solutions, start=1):
+            print(f"Solution {sol_num}:")
+            grid = [[[0]*self.size for _ in range(self.size)] for _ in range(self.size)]
+            for depth, (x, y, z) in enumerate(solution):
+                grid[x][y][z] = depth + 1
+            for layer in grid:
+                for row in layer:
+                    print(' '.join(f"{val:3}" for val in row))
+                print()
+    
+    def plot_solution(self, solution: Optional[List[Tuple[int, int, int]]] = None,
+                      name: str = "snake cube") -> None:
+        """ Plot a single solution in 3D space using matplotlib, coloring the points along the path as a gradient """
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+        from matplotlib import cm
+        import numpy as np
+        from matplotlib.ticker import MaxNLocator
+        
+        # Use the first solution if none provided
+        if solution is None:
+            if not self.solutions:
+                print(f"No solutions to plot for {name} puzzle.")
+                return
+            solution = self.solutions[0]
+
+        fig = plt.figure()
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Extract x, y, z coordinates
+        x = [point[0] for point in solution]
+        y = [point[1] for point in solution]
+        z = [point[2] for point in solution]
+
+        # Create a colormap based on the length of the solution
+        colors = cm.viridis(np.linspace(0, 1, len(solution)))
+
+        # Plot each segment with a different color
+        for i in range(len(solution) - 1):
+            ax.plot(x[i:i+2], y[i:i+2], z[i:i+2], color=colors[i])
+
+        # Plot bold points at each block position
+        ax.scatter(x, y, z, c=colors, s=50, edgecolors='black', linewidths=2, zorder=5)
+
+        # Add block number labels to each point (1-indexed)
+        for i, (px, py, pz) in enumerate(solution, start=1):
+            ax.text(px - 0.05, py - 0.05, pz + 0.05, str(i), fontsize=10, ha='right', va='bottom')
+
+        # Set axis labels to show only integers
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.zaxis.set_major_locator(MaxNLocator(integer=True))
+
+        ax.set_xlabel('X axis')
+        ax.set_ylabel('Y axis')
+        ax.set_zlabel('Z axis')
+        # ax.set_title(f'Snake Cube Solution {self.solutions.index(solution) + 1} Path for {name} puzzle')
+        ax.set_title(f'Snake Cube Solution Path for {name} puzzle')
+
+        # Set default viewing angle
+        ax.view_init(elev=10, azim=-80)
+
+        plt.show()
+
+    def create_solution_figure(self, solution: Optional[List[Tuple[int, int, int]]] = None,
+                               name: str = "snake cube",
+                               idx: int = 0):
+        """Create and return a matplotlib figure for a solution without displaying it."""
+        import matplotlib.pyplot as plt
+        from mpl_toolkits.mplot3d import Axes3D
+        from matplotlib import cm
+        import numpy as np
+        from matplotlib.ticker import MaxNLocator
+
+        # Use the first solution if none provided
+        if solution is None:
+            if not self.solutions:
+                return None
+            solution = self.solutions[0]
+
+        fig = plt.figure(figsize=(10, 8))
+        ax = fig.add_subplot(111, projection='3d')
+
+        # Extract x, y, z coordinates
+        x = [point[0] for point in solution]
+        y = [point[1] for point in solution]
+        z = [point[2] for point in solution]
+
+        # Create a colormap based on the length of the solution
+        colors = cm.viridis(np.linspace(0, 1, len(solution)))
+
+        # Plot each segment with a different color
+        for i in range(len(solution) - 1):
+            ax.plot(x[i:i+2], y[i:i+2], z[i:i+2], color=colors[i])
+
+        # Plot bold points at each block position
+        ax.scatter(x, y, z, c=colors, s=50, edgecolors='black', linewidths=2, zorder=5)
+
+        # Add block number labels to each point (1-indexed)
+        for i, (px, py, pz) in enumerate(solution, start=1):
+            ax.text(px - 0.05, py - 0.05, pz + 0.05, str(i), fontsize=10, ha='right', va='bottom')
+
+        # Set axis labels to show only integers
+        ax.xaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.yaxis.set_major_locator(MaxNLocator(integer=True))
+        ax.zaxis.set_major_locator(MaxNLocator(integer=True))
+
+        ax.set_xlabel('X axis')
+        ax.set_ylabel('Y axis')
+        ax.set_zlabel('Z axis')
+        ax.set_title(f'Snake Cube Solution {idx + 1} Path for {name} puzzle')
+
+        # Set default viewing angle
+        ax.view_init(elev=10, azim=-80)
+
+        return fig
+
+    def create_solutions_gif(self, name: str = "snake_cube",
+                            duration: float = 1.0,
+                            output_path: str = None) -> str:
+        """
+        Create an animated GIF from all solutions.
+
+        Args:
+            name: Name of the puzzle (used in filename if output_path not provided)
+            duration: Duration each frame is displayed in seconds
+            output_path: Optional custom output path for the GIF
+
+        Returns:
+            Path to the created GIF file
+        """
+        import matplotlib.pyplot as plt
+        from io import BytesIO
+        from PIL import Image
+
+        if not self.solutions:
+            print(f"No solutions to create GIF for {name} puzzle.")
+            return None
+
+        # Generate output path if not provided
+        if output_path is None:
+            output_path = f"{name.replace(' ', '_')}_solutions.gif"
+
+        frames = []
+
+        # Create a frame for each solution
+        for idx, solution in enumerate(self.solutions):
+            print(f"Creating frame {idx + 1}/{len(self.solutions)}...")
+            fig = self.create_solution_figure(solution=solution, name=name, idx=idx)
+
+            # Save figure to buffer
+            buf = BytesIO()
+            fig.savefig(buf, format='png', dpi=100, bbox_inches='tight')
+            buf.seek(0)
+
+            # Load image from buffer
+            img = Image.open(buf)
+            frames.append(img.copy())
+
+            # Close figure and buffer
+            plt.close(fig)
+            buf.close()
+
+        # Save as GIF
+        if frames:
+            frames[0].save(
+                output_path,
+                save_all=True,
+                append_images=frames[1:],
+                duration=int(duration * 1000),  # Convert to milliseconds
+                loop=0  # Loop forever
+            )
+            print(f"GIF saved to: {output_path}")
+            return output_path
+
+        return None
+
+def solve_puzzle(solver: SnakeCubeSolver,
+                 constraints: str,
+                 name: str = "snake cube",
+                 start_paths: list = None,
+                 show_plot: bool = True,
+                 create_gif: bool = False,
+                 gif_duration: float = 1.5) -> None:
+    """
+    Solve a given snake cube puzzle with specified constraints and starting paths.
+
+    Args:
+        solver: SnakeCubeSolver instance
+        constraints: String of 'S' and 'C' characters
+        name: Name of the puzzle
+        start_paths: List of starting paths to try
+        show_plot: Whether to display individual plots (ignored if create_gif is True)
+        create_gif: Whether to create an animated GIF of all solutions
+        gif_duration: Duration (in seconds) each frame is displayed in the GIF
+    """
+    start_time = time.time()
+    # Reset solver with new constraints
+    solver.reset_with_constraints(constraints)
+
+    # Find solutions for each starting path in the list of possible starting paths
+    solution_found = False
+    for path in start_paths:
+        solver.reset_with_path(path)
+        depth = len(path)
+        if solver.solve(depth=depth,
+                        position=path[-1],
+                        prev_direction=solver.calculate_previous_direction(depth=depth)):
+            solution_found = True
+
+    # Display results
+    end_time = time.time()
+    print(f"Time taken to solve {name} puzzle: {end_time - start_time:.6f} seconds")
+    if solution_found:
+        print(f"Solutions found for {name} puzzle with starting path {path}!")
+        solver.display_solutions_path()
+        solver.display_solutions_grid()
+
+        # Create GIF or show individual plots
+        if create_gif:
+            solver.create_solutions_gif(name=name, duration=gif_duration)
+        elif show_plot:
+            solver.plot_solution(name=name)
+    else:
+        print("No solution exists for {name} puzzle with starting path {path}.")
+
+def solve_all_puzzles() -> None:
+    """ Solve all predefined snake cube puzzles and display results."""
+    # Example starting locations for 3x3x3 cube
+    # Must start at a grid point with an even sum of coordinates
+    # Every other point is symmetric to one of these
+    default_3x3_starting_paths = [[(0, 0, 0)], [(1, 1, 0)]]
+    
+    # define puzzles
+    blue_constraints = 'SCCCCSCSCCCCCCCCCCCSCSCCCCS'
+    blue_starting_paths = [[(1, 1, 0), (1, 0, 0), (1, 0, 1), (0, 0, 1)],  # 5 valid asymmetric solutions
+                           [(1, 1, 0), (1, 1, 1), (1, 0, 1), (0, 0, 1)],  # 1 valid asymmetric solution
+                           [(0, 0, 0), (1, 0, 0), (1, 1, 0)]]  # 6 valid asymmetric solutions
+    
+    green_constraints = 'SSCCCSCCSCCCSCSCCCCSCSCSCSS'
+    green_starting_paths = [[(0, 0, 0), (1, 0, 0), (2, 0, 0), (2, 1, 0)]]  # Only valid starting path for this puzzle
+    
+    orange_constraints = 'SSCCCCCCCCCSCCCCCCCSCSCCCCS'
+    orange_starting_paths = [[(0, 0, 0), (1, 0, 0), (2, 0, 0), (2, 1, 0)]]  # Only valid starting path for this puzzle
+    
+    red_constraints = 'SSCCCCCCSCCSCCCCCSCCSCCCCSS'
+    red_starting_paths = [[(0, 0, 0), (1, 0, 0), (2, 0, 0), (2, 1, 0)]]  # Only valid starting path for this puzzle
+    
+    four_constraints = 'CSCCSCCCSSCCSCCSCCSCCCCCCCCCSCSCCCCCCSCSSCCCCSSCCSCCCCCCCCCCSSCC'
+    four_starting_paths = [[(0, 0, 0), (1, 0, 0), (2, 0, 0), (2, 1, 0)]]  # Only valid starting path for this 4x4x4
+    
+    # solve all puzzles
+    solver = SnakeCubeSolver(early_stop=False)
+    start_time = time.time()
+    
+    # 3x3x3 puzzles, solves in <1 second each
+    solve_puzzle(solver, blue_constraints, "blue 3x3x3", blue_starting_paths, show_plot=True, create_gif=False, gif_duration=1.5)
+    solve_puzzle(solver, green_constraints, "green 3x3x3", green_starting_paths, show_plot=True, create_gif=False, gif_duration=1.5)
+    solve_puzzle(solver, orange_constraints, "orange 3x3x3", orange_starting_paths, show_plot=True, create_gif=False, gif_duration=1.5)
+    solve_puzzle(solver, red_constraints, "red 3x3x3", red_starting_paths, show_plot=True, create_gif=False, gif_duration=1.5)
+    
+    # # 4x4x4 puzzle, solves on the order of 1 minute
+    solve_puzzle(solver, four_constraints, "4x4x4", four_starting_paths, show_plot=True, create_gif=False, gif_duration=1.5)
+    
+    end_time = time.time()
+    print(f"Time taken to solve all puzzles: {end_time - start_time:.6f} seconds")
+
+def example():
+    path = [(0, 0, 0), (1, 0, 0), (2, 0, 0), (2, 1, 0)]
+    solver = SnakeCubeSolver(constraints='SSCCCCCCSCCSCCCCCSCCSCCCCSS',
+                            path=path)
+    depth = len(path)
+    if solver.solve(depth=depth,
+                    position=path[-1],
+                    prev_direction=solver.calculate_previous_direction(depth=depth)):
+        print("Solution found!")
+        solver.display_solutions_grid()
+    else:
+        print("No solution exists.")
+
+if __name__ == "__main__":
+    # solve_all_puzzles()  # On the order of 1 minute to run all cases, dominated by 4x4x4 case.
+    example()  # Simple example case for blog post

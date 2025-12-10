@@ -1,0 +1,55 @@
+---
+title: "Multiples of 3 or 5"
+category: "project-euler"
+difficulty: "Easy"
+tags: ["Math", "Algorithm"]
+date: "2024-01-10"
+excerpt: "Find the sum of all multiples of 3 or 5 below 1000 using the Inclusion-Exclusion Principle."
+source_url: "https://projecteuler.net/problem=1"
+---
+
+## Problem Statement
+
+If we list all the natural numbers below 10 that are multiples of 3 or 5, we get 3, 5, 6, and 9. The sum of these multiples is 23.
+
+Find the sum of all the multiples of 3 or 5 below 1000.
+
+## Mathematical Approach
+
+Instead of iterating through all numbers, we can use the formula for the sum of an arithmetic sequence.
+
+The sum of multiples of `n` below `limit` is:
+- Count = floor((limit - 1) / n)
+- Sum = n × (Count × (Count + 1)) / 2
+
+## Solution
+
+```javascript
+function sumMultiples(n, limit) {
+    const count = Math.floor((limit - 1) / n);
+    return n * count * (count + 1) / 2;
+}
+
+function euler001(limit) {
+    const sum3 = sumMultiples(3, limit);
+    const sum5 = sumMultiples(5, limit);
+    const sum15 = sumMultiples(15, limit); // Numbers divisible by both 3 and 5
+
+    // Subtract sum15 because we counted these twice
+    return sum3 + sum5 - sum15;
+}
+
+console.log(euler001(1000)); // Answer for numbers below 1000
+```
+
+## Complexity Analysis
+
+- **Time Complexity**: O(1) - Constant time using mathematical formula
+- **Space Complexity**: O(1) - No additional space needed
+
+## Explanation
+
+We use the **Inclusion-Exclusion Principle**:
+- Sum of multiples of 3 or 5 = (Sum of multiples of 3) + (Sum of multiples of 5) - (Sum of multiples of 15)
+
+The subtraction is necessary because numbers divisible by both 3 and 5 (i.e., multiples of 15) are counted twice.
