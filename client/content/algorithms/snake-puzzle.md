@@ -244,7 +244,9 @@ Results from the python script are presented below in the form of images or GIFs
 10 Solutions for the orange snake cube with constraints `"SSCCCCCCCCCSCCCCCCCSCSCCCCS"`
 ![orange snake cube python solution gif](/algorithms/orange_3x3x3_solutions.gif "w:350")
 
-1 Solution for the brown snake cube with constraints `"CSCCSCCCSSCCSCCSCCSCCCCCCCCCSCSCCCCCCSCSSCCCCSSCCSCCCCCCCCCCSSCC"`
+1 Solution for the brown snake cube with constraints:
+
+`"CSCCSCCCSSCCSCCSCCSCCCCCCCCCSCSCCCCCCSCSSCCCCSSCCSCCCCCCCCCCSSCC"`
 ![brown 4x4x4 snake cube python solution plot](/algorithms/brown_4x4x4_solution.png "w:350")
 
 ## Conclusion
