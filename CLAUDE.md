@@ -7,7 +7,7 @@ Personal website monorepo showcasing LeetCode solutions, Project Euler problems,
 ```
 personal-website/
 ├── client/                 # Next.js Frontend (React)
-│   ├── app/               # Next.js 14 App Router
+│   ├── app/               # Next.js 16 App Router
 │   ├── components/        # Reusable React components
 │   ├── lib/              # API utilities
 │   └── package.json
@@ -24,7 +24,7 @@ personal-website/
 ## Tech Stack
 
 ### Frontend (client/)
-- **Framework**: Next.js 14 (App Router)
+- **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
 - **Styling**: Tailwind CSS
 - **Key Dependencies**:
@@ -36,7 +36,7 @@ personal-website/
 
 ### Backend (server/)
 - **Framework**: Spring Boot 3.2
-- **Language**: Java 17
+- **Language**: Java 21
 - **Database**: PostgreSQL
 - **Key Features**:
   - REST API endpoints

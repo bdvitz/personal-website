@@ -46,7 +46,7 @@ export default function Home() {
             <Blocks className="w-16 h-16 text-red-400 mb-4 group-hover:scale-110 transition-transform duration-300" />
             <h2 className="text-3xl font-bold text-white mb-3">Rubik's Cubes</h2>
             <p className="text-purple-200 leading-relaxed">
-              Documentation of my cubing journey and samples of art mosaics
+              Rubik's cube mosaic artwork and (planned) imaging tiling
             </p>
             <div className="mt-6 inline-flex items-center text-red-400 font-semibold group-hover:translate-x-2 transition-transform duration-200">
               View Projects →
@@ -81,10 +81,11 @@ export default function Home() {
           <div>
             <h3 className="text-xl font-semibold text-purple-300 mb-3">Frontend</h3>
             <ul className="space-y-2 text-purple-100">
-              <li>• Next.js 14 (React)</li>
+              <li>• Next.js 16 (React 19)</li>
               <li>• Tailwind CSS</li>
               <li>• React Markdown + KaTeX</li>
               <li>• Recharts</li>
+              <li>• Vercel Hosting</li>
             </ul>
           </div>
           <div>
