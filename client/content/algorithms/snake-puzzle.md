@@ -246,7 +246,7 @@ Results from the python script are presented below in the form of images or GIFs
 
 1 Solution for the brown snake cube with constraints:
 
-`"CSCCSCCCSSCCSCCSCCSCCCCCCCCCSCSCCCCCCSCSSCCCCSSCCSCCCCCCCCCCSSCC"`
+`"CSCCSCCCSSCCSCCSCCSCCCCCCCCCSCSC CCCCCSCSSCCCCSSCCSCCCCCCCCCCSSCC"`
 ![brown 4x4x4 snake cube python solution plot](/algorithms/brown_4x4x4_solution.png "w:350")
 
 ## Conclusion
