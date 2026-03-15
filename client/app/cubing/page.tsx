@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { X } from 'lucide-react'
+import { X, Wand2 } from 'lucide-react'
 import Image from 'next/image'
+import Link from 'next/link'
 
 interface MosaicImage {
   src: string
@@ -70,12 +71,31 @@ export default function CubingPage() {
         </p>
       </div>
 
+      {/* Mosaic Generator CTA */}
+      <Link href="/cubing/mosaic">
+        <div className="card group cursor-pointer bg-purple-900/20 border border-purple-500/30 hover:border-purple-400/60 transition-all duration-300">
+          <div className="flex items-center gap-4">
+            <Wand2 className="w-10 h-10 text-purple-400 flex-shrink-0 group-hover:scale-110 transition-transform duration-300" />
+            <div>
+              <h2 className="text-xl font-bold text-white mb-1">Try the Mosaic Generator</h2>
+              <p className="text-purple-200 text-sm">
+                Upload any image and convert it to a Rubik's cube mosaic using nearest-neighbor,
+                k-means, or a smoothed OR algorithm.
+              </p>
+            </div>
+            <span className="ml-auto text-purple-400 font-semibold group-hover:translate-x-2 transition-transform duration-200 flex-shrink-0">
+              Open →
+            </span>
+          </div>
+        </div>
+      </Link>
+
       {/* Gallery Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {mosaicImages.map((image, index) => (
           <div
             key={index}
-            className="card group cursor-pointer overflow-hidden transform transition-all duration-300 hover:scale-105 hover:shadow-2xl"
+            className="relative card group cursor-pointer overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:z-10"
             onClick={() => setSelectedImage(image)}
           >
             <div className="relative aspect-square w-full overflow-hidden rounded-lg bg-purple-900/30 flex items-center justify-center">
