@@ -33,6 +33,7 @@ export default function MosaicTool() {
   const [method, setMethod] = useState<Method>('nearest')
   const [smoothing, setSmoothing] = useState(0.5)
   const [assignment, setAssignment] = useState<Int32Array | null>(null)
+  const [colorPerm, setColorPerm] = useState<number[]>([0, 1, 2, 3, 4, 5])
   const [isProcessing, setIsProcessing] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
 
@@ -51,11 +52,11 @@ export default function MosaicTool() {
     runSolver(imageUrl, gridCols, gridRows, cellPx, method, smoothing)
   }, [imageUrl, gridCols, gridRows, cellPx, method, smoothing])
 
-  // Draw mosaic whenever assignment or display size changes
+  // Draw mosaic whenever assignment, display size, or color permutation changes
   useEffect(() => {
     if (!assignment || !mosaicCanvasRef.current) return
-    drawMosaic(mosaicCanvasRef.current, assignment, gridCols, gridRows, cellPx)
-  }, [assignment, gridCols, gridRows, cellPx])
+    drawMosaic(mosaicCanvasRef.current, assignment, gridCols, gridRows, cellPx, colorPerm)
+  }, [assignment, gridCols, gridRows, cellPx, colorPerm])
 
   const runSolver = useCallback(
     async (url: string, c: number, r: number, cp: number, m: Method, sw: number) => {
@@ -110,10 +111,19 @@ export default function MosaicTool() {
     setIsCropping(false)
   }
 
+  const randomizeColors = () => {
+    const perm = [0, 1, 2, 3, 4, 5]
+    for (let i = 5; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1))
+      ;[perm[i], perm[j]] = [perm[j], perm[i]]
+    }
+    setColorPerm(perm)
+  }
+
   const colorCounts = assignment
     ? CUBE_COLORS.map((c, i) => ({
         ...c,
-        count: Array.from(assignment).filter(v => v === i).length,
+        count: Array.from(assignment).filter(v => colorPerm[v] === i).length,
       }))
     : null
 
@@ -256,6 +266,26 @@ export default function MosaicTool() {
             </div>
           </div>
         )}
+
+        {/* Color permutation */}
+        <div>
+          <p className="text-sm text-purple-300 mb-2 font-medium">Color assignment</p>
+          <div className="flex gap-2">
+            <button
+              onClick={randomizeColors}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white/10 text-purple-200 hover:bg-white/20 transition-colors"
+            >
+              Randomize
+            </button>
+            <button
+              onClick={() => setColorPerm([0, 1, 2, 3, 4, 5])}
+              disabled={colorPerm.every((v, i) => v === i)}
+              className="px-3 py-1.5 rounded-lg text-sm font-medium bg-white/10 text-purple-200 hover:bg-white/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Reset
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Canvases */}
@@ -363,7 +393,7 @@ async function downsample(
   })
 }
 
-function drawMosaic(canvas: HTMLCanvasElement, assignment: Int32Array, cols: number, rows: number, cellPx: number) {
+function drawMosaic(canvas: HTMLCanvasElement, assignment: Int32Array, cols: number, rows: number, cellPx: number, colorPerm: number[]) {
   const step = cellPx + GRID_LINE
   const panelW = cols * step + GRID_LINE
   const panelH = rows * step + GRID_LINE
@@ -375,7 +405,7 @@ function drawMosaic(canvas: HTMLCanvasElement, assignment: Int32Array, cols: num
 
   for (let i = 0; i < assignment.length; i++) {
     const row = Math.floor(i / cols), col = i % cols
-    ctx.fillStyle = CUBE_COLORS[assignment[i]].hex
+    ctx.fillStyle = CUBE_COLORS[colorPerm[assignment[i]]].hex
     ctx.fillRect(GRID_LINE + col * step, GRID_LINE + row * step, cellPx, cellPx)
   }
 }
