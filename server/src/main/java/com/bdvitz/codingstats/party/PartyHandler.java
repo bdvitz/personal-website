@@ -16,7 +16,7 @@ import java.util.Map;
 /**
  * JSON protocol for /ws/party. Every message is {@code {type, ...}}.
  * Client to server: hostHello{code,hostToken}, join{code,name}, rejoin{code,token},
- * selectGame{gameId}, start{gameId?}, advance, input{input}, kick{playerId}, setVip{playerId}, backToLobby, closeRoom, ping.
+ * selectGame{gameId}, start{gameId?}, advance, input{input}, kick{playerId}, setVip{playerId}, resetScores, backToLobby, closeRoom, ping.
  * Server to client: joined{playerId,token,code}, state{...}, error{code,message},
  * closed{message}, kicked, replaced, pong.
  */
@@ -66,6 +66,7 @@ public class PartyHandler extends TextWebSocketHandler {
                 case "input" -> roomService.input(out, msg.path("input"));
                 case "kick" -> roomService.kick(out, text(msg, "playerId"));
                 case "setVip" -> roomService.setVip(out, text(msg, "playerId"));
+                case "resetScores" -> roomService.resetScores(out);
                 case "backToLobby" -> roomService.backToLobby(out);
                 case "closeRoom" -> roomService.closeRoom(out);
                 default -> roomService.send(out, error("INVALID", "Unknown message type"));

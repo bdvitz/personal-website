@@ -34,4 +34,5 @@ public class Player {
     /** Room-level running total across all games played in the room. */
     public int getScore() { return score; }
     public void addScore(int points) { this.score += points; }
+    public void resetScore() { this.score = 0; }
 }

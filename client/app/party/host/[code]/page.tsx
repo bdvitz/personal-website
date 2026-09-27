@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import QRCode from 'react-qr-code'
-import { DoorClosed, Home, SkipForward, Square, WifiOff } from 'lucide-react'
+import { DoorClosed, Home, RotateCcw, SkipForward, Square, WifiOff } from 'lucide-react'
 import { usePartySocket } from '@/lib/party/usePartySocket'
 import { PARTY_GAMES } from '@/components/party/games/registry'
 import GamePicker from '@/components/party/GamePicker'
@@ -123,6 +123,15 @@ export default function PartyHostPage() {
               onKick={(playerId) => send({ type: 'kick', playerId })}
               onMakeVip={(playerId) => send({ type: 'setVip', playerId })}
             />
+            {inLobby && room.players.length + room.waiting.length > 0 && (
+              <button
+                type="button"
+                onClick={() => confirm("Reset everyone's points to zero?") && send({ type: 'resetScores' })}
+                className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-purple-300 hover:bg-white/10 hover:text-white"
+              >
+                <RotateCcw className="h-4 w-4" /> Reset points
+              </button>
+            )}
           </div>
 
           <div className="space-y-2 text-center">

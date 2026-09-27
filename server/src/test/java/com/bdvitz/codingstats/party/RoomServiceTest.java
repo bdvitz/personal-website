@@ -246,6 +246,22 @@ class RoomServiceTest {
     }
 
     @Test
+    void hostCanResetScoresOnlyFromTheLobby() throws Exception {
+        Client host = host();
+        Client alice = join("Alice");
+        service.start(alice.session, "mostlikely");
+        JsonNode vote = MAPPER.createObjectNode().put("kind", "target").put("playerId", alice.playerId());
+        service.input(alice.session, vote); // solo player may vote for themselves -> 1 point
+        assertEquals(1, host.state().path("room").path("players").get(0).path("score").asInt());
+
+        assertEquals("NOT_IN_LOBBY", code(() -> service.resetScores(host.session)));
+        service.backToLobby(host.session);
+        assertEquals("NOT_ALLOWED", code(() -> service.resetScores(alice.session)), "VIP can't reset scores");
+        service.resetScores(host.session);
+        assertEquals(0, alice.state().path("room").path("players").get(0).path("score").asInt());
+    }
+
+    @Test
     void kickingTheVipPassesVipOnAndNotifiesThePlayer() throws Exception {
         Client host = host();
         Client alice = join("Alice");

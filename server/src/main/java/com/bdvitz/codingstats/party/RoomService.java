@@ -320,6 +320,22 @@ public class RoomService {
         }
     }
 
+    /** Host screen zeroes everyone's room total. Lobby only, so a running game's scoring isn't disturbed. */
+    public void resetScores(WebSocketSession actor) {
+        Room room = roomOf(actor);
+        synchronized (room) {
+            if (!isHost(actor)) {
+                throw new PartyException("NOT_ALLOWED", "Only the host screen can reset scores.");
+            }
+            if (room.getStatus() != RoomStatus.LOBBY) {
+                throw new PartyException("NOT_IN_LOBBY", "Scores can only be reset from the lobby.");
+            }
+            room.allPlayers().forEach(Player::resetScore);
+            room.touch(System.currentTimeMillis());
+            broadcast(room);
+        }
+    }
+
     /** Host screen ends the room early, freeing a slot. */
     public void closeRoom(WebSocketSession actor) {
         Room room = roomOf(actor);
