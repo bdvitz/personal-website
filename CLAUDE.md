@@ -43,5 +43,5 @@ scripts/update-snapshot.sh   Regenerates client/public/data/stored-user-snapshot
 - UI: purple/glass-morphism Tailwind style (`card`, `btn-primary` classes in globals.css), lucide-react icons, mobile-friendly.
 
 ## Current initiative (2026-09)
-1. Chess: DONE on branch `chess-db-only`. Clients read DB/snapshot only, and the nightly/startup job refreshes stats + daily history. Deferred: automating snapshot regeneration.
+1. Chess: DONE and deployed (merged to `main`). Clients read DB/snapshot only, and the nightly/startup job refreshes stats + daily history. Deferred: automating snapshot regeneration.
 2. Party games for Bryan's 30th birthday, added to this same deployment under `/party`. Details in `party-games` skill.
