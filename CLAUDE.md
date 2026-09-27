@@ -1,199 +1,47 @@
-# CLAUDE.md - Project Context Summary
+# CLAUDE.md
 
-## Project Overview
-Personal website monorepo showcasing LeetCode solutions, Project Euler problems, and live Chess.com statistics tracking with historical progress visualization.
+Personal website monorepo (Bryan Vitz). Next.js frontend on Vercel + Spring Boot backend on Railway (free tier) + Railway Postgres. Both auto-deploy from `main`.
 
-## Repository Structure
+## Layout
 ```
-personal-website/
-├── client/                 # Next.js Frontend (React)
-│   ├── app/               # Next.js 16 App Router
-│   ├── components/        # Reusable React components
-│   ├── lib/              # API utilities
-│   └── package.json
-├── server/                # Spring Boot Backend (Java)
-│   ├── src/main/java/    # Java source code
-│   ├── src/main/resources/
-│   └── pom.xml
-├── .github/              # GitHub Actions workflows
-├── README.md             # Project documentation
-├── ARCHITECTURE.md       # System design details
-└── docs/                 # Additional documentation
+client/                      Next.js 16 App Router, TS (strict off), Tailwind, `@/*` -> client/*
+  app/page.tsx               Home
+  app/algorithms/            Markdown articles from client/content/algorithms/*.md (gray-matter, KaTeX)
+  app/chess/                 Chess stats page (see skill: chess-stats)
+  app/cubing/, cubing/mosaic Rubik's cube mosaic tool (client-only; logic in lib/mosaic/)
+  components/Navigation.tsx  Nav items array - add new top-level pages here
+  lib/api.ts                 All backend calls (axios, NEXT_PUBLIC_API_URL)
+  types/chess.ts
+server/                      Spring Boot 3.2, Java 21, package com.bdvitz.codingstats
+  controller/ service/ repository/ model/ scheduler/ config/
+scripts/update-snapshot.sh   Regenerates client/public/data/stored-user-snapshot.json
 ```
 
-## Tech Stack
+## Skills (load on demand instead of re-exploring)
+- `chess-stats` - chess subsystem: endpoints, tables, scheduler, snapshot, client page flow
+- `party-games` - planned multiplayer phone games: architecture decisions + free-tier constraints
 
-### Frontend (client/)
-- **Framework**: Next.js 16 (App Router)
-- **Language**: TypeScript
-- **Styling**: Tailwind CSS
-- **Key Dependencies**:
-  - react-markdown, KaTeX (LaTeX support)
-  - react-syntax-highlighter (code highlighting)
-  - recharts (Chess stats visualization)
-  - axios (API calls)
-  - lucide-react (icons)
+## Token hygiene
+- NEVER read: `client/public/data/stored-user-snapshot.json` (~190 KB), `client/package-lock.json`, `node_modules/`, `client/public/**` images.
+- `client/app/chess/page.tsx` is ~880 lines; read by line range when possible.
+- Older docs (README, ARCHITECTURE, docs/*, QUICKSTART, DEPLOYMENT, SNAPSHOT_SYSTEM, server/RAILWAY_MEMORY_OPTIMIZATION) are partly stale. Only open when a task needs deploy/setup specifics; trust code over docs.
 
-### Backend (server/)
-- **Framework**: Spring Boot 3.2
-- **Language**: Java 21
-- **Database**: PostgreSQL
-- **Key Features**:
-  - REST API endpoints
-  - Spring Data JPA
-  - Scheduled tasks for Chess.com API integration
-  - CORS configuration
+## Commands
+- Client: `cd client && npm run build` (best type/compile check), `npm run dev`, `npm run lint`
+- Server: `cd server && mvn -q clean compile` (compile check), `mvn spring-boot:run -Dspring-boot.run.profiles=local`
+- There are no automated tests in either app; verify with build/compile.
+- Local secrets: `server/src/main/resources/application-local.properties`, `client/.env.local` (both gitignored - never commit).
 
-## Key Configuration Files
+## Constraints that shape design
+- Railway free tier, 500 MB RAM. application.properties caps: Hikari pool 3, Tomcat `threads.max=20`, `max-connections=20`, `lazy-initialization=true`. Anything long-lived (WebSockets) must account for these.
+- Server may cold-start/sleep; frontend is designed to render from static snapshot first.
+- JPA `ddl-auto=update` - adding entity fields alters tables automatically; no migrations.
+- No auth anywhere. Any public endpoint is callable by anyone; don't expose endpoints that trigger outbound API calls or heavy work.
 
-### client/tsconfig.json
-- Configured with path aliases: `@/*` maps to `./*`
-- Next.js plugin enabled
-- TypeScript strict mode disabled
+## Conventions
+- Java: constructor injection in services (some controllers still use field `@Autowired`), SLF4J logging, controllers return `ResponseEntity<?>` with `Map.of("error", msg)` on failure.
+- UI: purple/glass-morphism Tailwind style (`card`, `btn-primary` classes in globals.css), lucide-react icons, mobile-friendly.
 
-### client/package.json
-- Contains Next.js dev/build/start scripts
-- All necessary dependencies for React, Next.js, and UI components
-
-## Common Issues & Solutions
-
-### Module Resolution
-**Issue**: "Module not found: Can't resolve '@/components/Navigation'"
-**Solution**: Ensure `tsconfig.json` has proper path mapping:
-```json
-{
-  "compilerOptions": {
-    "baseUrl": ".",
-    "paths": {
-      "@/*": ["./*"]
-    }
-  }
-}
-```
-
-## Development Commands
-
-### Client (Frontend)
-```bash
-cd client
-npm install           # Install dependencies
-npm run dev          # Start development server (localhost:3000)
-npm run build        # Build for production
-npm run start        # Start production server
-npm run lint         # Run ESLint
-```
-
-### Server (Backend)
-```bash
-cd server
-mvn clean install   # Install dependencies
-mvn spring-boot:run  # Start development server (localhost:8080)
-mvn test            # Run tests
-```
-
-## API Endpoints
-- `GET /api/chess/stats/current?username={username}` - Current chess stats
-- `GET /api/chess/stats/history?username={username}&days=30` - Rating history
-- `GET /api/chess/stats/ratings-over-time?username={username}&days=90` - Chart data
-- `GET /api/chess/stats/health` - Health check
-
-## Environment Setup
-
-### Overview
-This project uses environment variables to keep sensitive data (like database credentials) out of Git. Two files are used for local development, both are `.gitignored`:
-
-1. **`server/src/main/resources/application-local.properties`** - Backend database credentials
-2. **`client/.env.local`** - Frontend API URLs
-
-### Quick Setup for Local Development
-
-#### Backend Setup
-```bash
-cd server/src/main/resources
-cp application-local.properties.example application-local.properties
-# Edit application-local.properties with your Railway database credentials
-```
-
-**application-local.properties** (NOT committed to Git):
-```properties
-# Railway PostgreSQL Database
-spring.datasource.url=jdbc:postgresql://your-railway-host:port/railway
-spring.datasource.username=postgres
-spring.datasource.password=YOUR_RAILWAY_PASSWORD_HERE
-cors.allowed.origins=http://localhost:3000,http://localhost:3001
-chess.username=shia_justdoit
-```
-
-**Run with local profile:**
-```bash
-mvn spring-boot:run -Dspring-boot.run.profiles=local
-```
-
-#### Frontend Setup
-```bash
-cd client
-echo "NEXT_PUBLIC_API_URL=http://localhost:8080" > .env.local
-npm run dev
-```
-
-### How Environment Variables Work
-
-**Backend (application.properties):**
-The main `application.properties` file (committed to Git) uses placeholders:
-```properties
-spring.datasource.url=${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/codingstats}
-spring.datasource.username=${SPRING_DATASOURCE_USERNAME:postgres}
-spring.datasource.password=${SPRING_DATASOURCE_PASSWORD:postgres}
-```
-
-These will:
-1. Use `application-local.properties` values when running locally with `-Dspring-boot.run.profiles=local`
-2. Use Railway environment variables in production
-3. Fall back to default values (after `:`) if neither is set
-
-**Frontend (.env.local):**
-Next.js automatically loads `.env.local` during development. Variables prefixed with `NEXT_PUBLIC_` are accessible in browser code.
-
-### Security Notes
-- ✅ `.gitignore` already excludes: `application-local.properties`, `.env.local`
-- ✅ Never commit credentials to Git
-- ✅ Use different credentials for development and production
-- ⚠️ **Check before committing**: `git status` should NOT show these files
-
-## Deployment
-
-### Frontend (Vercel)
-- **Root directory**: `client`
-- **Environment Variables**: Set `NEXT_PUBLIC_API_URL` to your Railway backend URL
-- **Auto-deploy**: Pushes to `main` branch trigger deployment
-
-### Backend (Railway)
-- **Root directory**: `server`
-- **Database**: PostgreSQL service (linked or separate)
-- **Environment Variables**: Set via Railway dashboard:
-  - `SPRING_DATASOURCE_URL`
-  - `SPRING_DATASOURCE_USERNAME`
-  - `SPRING_DATASOURCE_PASSWORD`
-  - `CORS_ALLOWED_ORIGINS` (your Vercel URL)
-  - `CHESS_USERNAME`
-- **Auto-deploy**: Pushes to `main` branch trigger deployment
-
-**See [DEPLOYMENT.md](./DEPLOYMENT.md) for detailed deployment instructions.**
-
-## Project Features
-- LeetCode solutions with syntax highlighting and complexity analysis
-- Project Euler problems with LaTeX mathematical formulas
-- Real-time Chess.com rating tracking with visualizations
-- Glass-morphism UI with gradient-based design
-- Responsive design for all devices
-- Automated daily chess statistics updates
-
-## Content Structure
-- LeetCode solutions: `client/content/leetcode/*.md`
-- Project Euler solutions: `client/content/project-euler/*.md`
-- Markdown frontmatter includes metadata (title, difficulty, tags, etc.)
-
-## Recent Fixes
-- Fixed TypeScript path alias configuration for '@' symbol
-- Resolved "Module not found" error for Navigation component
-- Build process now completes successfully without module resolution errors
+## Current initiative (2026-09)
+1. Chess: DONE on branch `chess-db-only`. Clients read DB/snapshot only, and the nightly/startup job refreshes stats + daily history. Deferred: automating snapshot regeneration.
+2. Party games for Bryan's 30th birthday, added to this same deployment under `/party`. Details in `party-games` skill.
