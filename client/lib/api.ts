@@ -11,13 +11,35 @@ const apiClient = axios.create({
 // All chess data is read from the database; the server refreshes it from Chess.com nightly.
 // Removed Chess.com passthrough calls are documented in docs/removed-chess-guest-lookup.md.
 
+export const SERVER_OFFLINE_MESSAGE = 'Server is offline or starting up. Please wait a moment and try again.'
+
+// Error with a user-safe message. Server error text is never shown to visitors.
+export class ApiError extends Error {
+  offline: boolean
+  constructor(message: string, offline: boolean) {
+    super(message)
+    this.offline = offline
+  }
+}
+
+const toApiError = (error: any, fallback: string): ApiError => {
+  if (!error.response) {
+    // Network error or timeout: the server is asleep, deploying, or unreachable
+    return new ApiError(SERVER_OFFLINE_MESSAGE, true)
+  }
+  if (error.response.status === 404) {
+    return new ApiError('No stored chess data is available yet.', false)
+  }
+  return new ApiError(fallback, false)
+}
+
 // Fetch stored chess stats
 export const getChessStats = async (username: string) => {
   try {
     const response = await apiClient.get(`/api/chess/stats/current`, { params: { username } })
     return response.data
   } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to fetch chess statistics')
+    throw toApiError(error, 'Could not load chess statistics. Please try again later.')
   }
 }
 
@@ -29,7 +51,7 @@ export const getMonthHistory = async (username: string, year: number, month: num
     })
     return response.data
   } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to fetch month history')
+    throw toApiError(error, 'Could not load rating history. Please try again later.')
   }
 }
 

@@ -17,16 +17,12 @@ export interface UseCachedChessDataReturn {
   storeCachedData: (data: ChessDailyRating[], startDate: Date, endDate: Date) => void
   clearCache: () => void
   getLastCachedMonth: () => { year: number, month: number } | null
-  getCachedDataBeforeMonth: (year: number, month: number) => ChessDailyRating[]
   mergeAndStoreCachedData: (
     newData: ChessDailyRating[],
-    startYear: number,
-    startMonth: number,
-    endYear: number,
-    endMonth: number,
-    overwriteFromYear: number,
-    overwriteFromMonth: number
-  ) => void
+    fetchedMonths: string[],
+    startDate: Date,
+    endDate: Date
+  ) => ChessDailyRating[]
 }
 
 /**
@@ -105,70 +101,45 @@ export function useCachedChessData(): UseCachedChessDataReturn {
       return null
     }
 
-    // Get the last item (data is sorted by date)
-    const lastRating = cachedData[cachedData.length - 1]
-    const lastDate = new Date(lastRating.date)
-
-    return {
-      year: lastDate.getFullYear(),
-      month: lastDate.getMonth() + 1 // Convert from 0-indexed to 1-indexed
-    }
+    // Dates are 'YYYY-MM-DD' strings; parse directly to avoid timezone shifts
+    const [year, month] = cachedData[cachedData.length - 1].date.split('-').map(Number)
+    return { year, month }
   }
 
   /**
-   * Get all cached data before a specific month (exclusive)
-   * Used to keep historical data when merging with fresh data
-   */
-  const getCachedDataBeforeMonth = (year: number, month: number): ChessDailyRating[] => {
-    if (cachedData.length === 0) {
-      return []
-    }
-
-    // Create cutoff date (first day of the specified month)
-    const cutoffDate = new Date(year, month - 1, 1)
-    const cutoffDateStr = cutoffDate.toISOString().split('T')[0]
-
-    return cachedData.filter(rating => rating.date < cutoffDateStr)
-  }
-
-  /**
-   * Merge new data with existing cache, overwriting from a specific month onwards
-   * This is used for hybrid caching where we keep old data and only fetch recent months
-   *
-   * @param newData - New data fetched from server
-   * @param startYear - Start year of the full range
-   * @param startMonth - Start month of the full range (1-indexed)
-   * @param endYear - End year of the full range
-   * @param endMonth - End month of the full range (1-indexed)
-   * @param overwriteFromYear - Year to start overwriting from
-   * @param overwriteFromMonth - Month to start overwriting from (1-indexed)
+   * Merge freshly fetched months into the cache and return the merged list.
+   * Only months in fetchedMonths ('YYYY-MM') are replaced, so a month that failed
+   * to load keeps its cached data. The cached range grows to cover startDate..endDate.
+   * Returns the merged data directly because the state update is not visible until the next render.
    */
   const mergeAndStoreCachedData = (
     newData: ChessDailyRating[],
-    startYear: number,
-    startMonth: number,
-    endYear: number,
-    endMonth: number,
-    overwriteFromYear: number,
-    overwriteFromMonth: number
-  ): void => {
-    // Get cached data before the overwrite point
-    const oldData = getCachedDataBeforeMonth(overwriteFromYear, overwriteFromMonth)
+    fetchedMonths: string[],
+    startDate: Date,
+    endDate: Date
+  ): ChessDailyRating[] => {
+    const replaced = new Set(fetchedMonths)
+    const mergedData = [
+      ...cachedData.filter(rating => !replaced.has(rating.date.slice(0, 7))),
+      ...newData
+    ].sort((a, b) => a.date.localeCompare(b.date))
 
-    // Combine old data with new data
-    const mergedData = [...oldData, ...newData]
+    const requestedStart = startDate.getFullYear() * 12 + startDate.getMonth()
+    const requestedEnd = endDate.getFullYear() * 12 + endDate.getMonth()
+    const cachedStart = fetchedRange ? fetchedRange.startYear * 12 + fetchedRange.startMonth - 1 : requestedStart
+    const cachedEnd = fetchedRange ? fetchedRange.endYear * 12 + fetchedRange.endMonth - 1 : requestedEnd
+    const rangeStart = Math.min(requestedStart, cachedStart)
+    const rangeEnd = Math.max(requestedEnd, cachedEnd)
 
-    // Sort by date to ensure correct order
-    mergedData.sort((a, b) => a.date.localeCompare(b.date))
-
-    // Update cache with merged data and full range
     setCachedData(mergedData)
     setFetchedRange({
-      startYear,
-      startMonth,
-      endYear,
-      endMonth
+      startYear: Math.floor(rangeStart / 12),
+      startMonth: (rangeStart % 12) + 1,
+      endYear: Math.floor(rangeEnd / 12),
+      endMonth: (rangeEnd % 12) + 1
     })
+
+    return mergedData
   }
 
   return {
@@ -179,7 +150,6 @@ export function useCachedChessData(): UseCachedChessDataReturn {
     storeCachedData,
     clearCache,
     getLastCachedMonth,
-    getCachedDataBeforeMonth,
     mergeAndStoreCachedData
   }
 }

@@ -9,7 +9,7 @@ import ServerHealthIndicator from './components/ServerHealthIndicator'
 import HistoricalDataFetcher from './components/HistoricalDataFetcher'
 import { useCachedChessData } from './components/hooks/useCachedChessData'
 import { loadSnapshotData } from './components/SnapshotLoader'
-import { getChessStats, checkServerHealth } from '@/lib/api'
+import { getChessStats, checkServerHealth, ApiError, SERVER_OFFLINE_MESSAGE } from '@/lib/api'
 import { ChessStats, ChessDailyRating } from '@/types/chess'
 
 // All data comes from the snapshot file or the database (refreshed nightly by the server).
@@ -39,6 +39,7 @@ export default function ChessPage() {
 
   // Fetching state for HistoricalDataFetcher component
   const [isFetching, setIsFetching] = useState(false)
+  const [checkingServer, setCheckingServer] = useState(false) // health check before a history load
   const [fetchParams, setFetchParams] = useState<{
     username: string
     startDate: Date
@@ -178,8 +179,9 @@ export default function ChessPage() {
       setServerOnline(true)
       setUsingSnapshot(false)
     } catch (err: any) {
-      setError(err.message || 'Failed to refresh stats')
-      setServerOnline(false)
+      const offline = !(err instanceof ApiError) || err.offline
+      setError(offline ? SERVER_OFFLINE_MESSAGE : err.message)
+      if (offline) setServerOnline(false)
     } finally {
       setRefreshing(false)
     }
@@ -187,26 +189,31 @@ export default function ChessPage() {
 
   // Load historical data from database
   const handleLoadFromDatabase = async () => {
-    // Check server health before fetching
-    const isOnline = await checkServerHealth(5000)
-    setServerOnline(isOnline)
+    setCheckingServer(true)
+    setError(null)
+    try {
+      // Reading the stats doubles as the server check, so offline is reported the same way as Refresh Stats
+      const statsData = await getChessStats(DEFAULT_USERNAME)
+      setStats(statsData)
+      setServerOnline(true)
+      setUsingSnapshot(false)
+    } catch (err: any) {
+      if (!(err instanceof ApiError) || err.offline) {
+        // Leave the chart alone: it already shows the cached data, and re-rendering it is expensive
+        setError(SERVER_OFFLINE_MESSAGE)
+        setServerOnline(false)
+        return
+      }
+      // Server is up but stats could not be read; still try the history
+    } finally {
+      setCheckingServer(false)
+    }
 
     const { startDate, endDate } = calculateDateRange(
       timeOption,
       { year: customStartYear, month: customStartMonth },
       { year: customEndYear, month: customEndMonth }
     )
-
-    if (!isOnline) {
-      // Try to use cache if available
-      if (isCached(startDate, endDate)) {
-        refreshChartFromCache(timeOption)
-      }
-      setError('Server is offline. Please wait and try again.')
-      return
-    }
-
-    // Server online - trigger hybrid fetch
     setIsFetching(true)
     setFetchParams({ username: DEFAULT_USERNAME, startDate, endDate })
   }
@@ -312,11 +319,11 @@ export default function ChessPage() {
             </button>
             <button
               onClick={handleLoadFromDatabase}
-              disabled={isFetching}
+              disabled={isFetching || checkingServer}
               className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100 flex items-center space-x-2"
             >
-              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-              <span>{isFetching ? 'Loading...' : 'Load Rating from Database'}</span>
+              <RefreshCw className={`w-4 h-4 ${isFetching || checkingServer ? 'animate-spin' : ''}`} />
+              <span>{isFetching || checkingServer ? 'Loading...' : 'Load Rating from Database'}</span>
             </button>
           </div>
         </div>

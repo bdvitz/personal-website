@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
-import { getMonthHistory } from '@/lib/api'
+import { getMonthHistory, ApiError } from '@/lib/api'
 import { ChessDailyRating } from '@/types/chess'
 import type { UseCachedChessDataReturn } from './hooks/useCachedChessData'
 
@@ -68,7 +68,12 @@ export default function HistoricalDataFetcher({
         return await getMonthHistory(user, year, month)
       } catch (error: any) {
         lastError = error
-        console.warn(`Attempt ${attempt}/${maxRetries} failed for ${year}-${month.toString().padStart(2, '0')}: ${error.message}`)
+        console.warn(`Attempt ${attempt}/${maxRetries} failed for ${year}-${month.toString().padStart(2, '0')}`)
+
+        // Server unreachable: retrying every month would just stack timeouts
+        if (error instanceof ApiError && error.offline) {
+          throw error
+        }
 
         if (attempt < maxRetries) {
           const delayMs = 500 * Math.pow(2, attempt - 1)
@@ -102,35 +107,30 @@ export default function HistoricalDataFetcher({
         }
       }
 
-      // Stored users with hybrid fetch: determine what to fetch
+      // Hybrid fetch: keep cached months and only fetch from the last cached month onwards.
+      // Only valid when the cache already covers the start of the requested range.
       let fetchStartDate = startDate
-      let fetchEndDate = endDate
-      let overwriteFromYear: number | null = null
-      let overwriteFromMonth: number | null = null
-      let shouldMerge = false
+      const range = cacheHook.fetchedRange
+      const lastCached = cacheHook.getLastCachedMonth()
+      const cacheCoversStart = range !== null &&
+        range.startYear * 12 + range.startMonth <= startDate.getFullYear() * 12 + startDate.getMonth() + 1
 
-      if (useHybridFetch) {
-        const lastCached = cacheHook.getLastCachedMonth()
-
-        if (lastCached) {
-          // We have cached data - only fetch from last cached month onwards
-          fetchStartDate = new Date(lastCached.year, lastCached.month - 1, 1)
-          overwriteFromYear = lastCached.year
-          overwriteFromMonth = lastCached.month
-          shouldMerge = true
-          console.log(`Hybrid fetch: Using cache up to ${lastCached.year}-${lastCached.month}, fetching from there onwards`)
-        } else {
-          // No cache - fetch everything
-          console.log('No cache available, fetching full range')
+      if (useHybridFetch && lastCached && cacheCoversStart) {
+        const lastCachedStart = new Date(lastCached.year, lastCached.month - 1, 1)
+        if (lastCachedStart > fetchStartDate) {
+          fetchStartDate = lastCachedStart
         }
+        console.log(`Hybrid fetch: using cache up to ${lastCached.year}-${lastCached.month}, fetching from there onwards`)
       }
 
       // Create abort controller
       abortControllerRef.current = new AbortController()
 
       try {
-        const months = generateMonthList(fetchStartDate, fetchEndDate)
-        const allRatings: ChessDailyRating[] = []
+        const months = generateMonthList(fetchStartDate, endDate)
+        const fetchedRatings: ChessDailyRating[] = []
+        const fetchedMonths: string[] = []
+        let failedCount = 0
 
         for (let i = 0; i < months.length; i++) {
           // Check if cancelled
@@ -157,44 +157,37 @@ export default function HistoricalDataFetcher({
 
           try {
             const monthRatings = await fetchMonthWithRetry(username, year, month)
-            allRatings.push(...monthRatings)
+            fetchedRatings.push(...monthRatings)
+            fetchedMonths.push(monthStr)
           } catch (error: any) {
-            console.error(`Failed to fetch ${monthStr}:`, error.message)
-            // Continue with other months
+            // Offline: stop now and leave the cache untouched
+            if (error instanceof ApiError && error.offline) {
+              throw error
+            }
+            console.error(`Failed to fetch ${monthStr}`)
+            failedCount++
           }
         }
 
         setFetchProgress(null)
 
-        // Store in cache (merge if hybrid, replace if not)
-        if (shouldMerge && overwriteFromYear !== null && overwriteFromMonth !== null) {
-          // Hybrid: merge new data with existing cache
-          cacheHook.mergeAndStoreCachedData(
-            allRatings,
-            startDate.getFullYear(),
-            startDate.getMonth() + 1,
-            endDate.getFullYear(),
-            endDate.getMonth() + 1,
-            overwriteFromYear,
-            overwriteFromMonth
-          )
+        if (fetchedMonths.length === 0) {
+          onError('Could not load rating history. Please try again later.')
+          return
+        }
 
-          // Get the merged data to return
-          const mergedData = cacheHook.getCachedDataForRange(startDate, endDate)
-          if (mergedData) {
-            onDataFetched(mergedData)
-          } else {
-            // Fallback: return just the fetched data
-            onDataFetched(allRatings)
-          }
-        } else {
-          // Normal: replace cache entirely
-          cacheHook.storeCachedData(allRatings, startDate, endDate)
-          onDataFetched(allRatings)
+        // Replace only the months that loaded; failed months keep their cached data
+        const mergedData = cacheHook.mergeAndStoreCachedData(fetchedRatings, fetchedMonths, startDate, endDate)
+        const startStr = startDate.toISOString().split('T')[0]
+        const endStr = endDate.toISOString().split('T')[0]
+        onDataFetched(mergedData.filter(rating => rating.date >= startStr && rating.date <= endStr))
+
+        if (failedCount > 0) {
+          onError(`${failedCount} month(s) could not be loaded. Please try again later.`)
         }
       } catch (error: any) {
         setFetchProgress(null)
-        onError(error.message || 'Failed to fetch chess history')
+        onError(error instanceof ApiError ? error.message : 'Could not load rating history. Please try again later.')
       } finally {
         abortControllerRef.current = null
       }

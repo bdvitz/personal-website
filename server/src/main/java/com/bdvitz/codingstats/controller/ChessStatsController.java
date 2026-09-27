@@ -41,7 +41,7 @@ public class ChessStatsController {
             return ResponseEntity.ok(chessStat);
         } catch (NoSuchElementException e) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "No stored stats found"));
         } catch (Exception e) {
             logger.error("Error fetching current stats", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -68,7 +68,7 @@ public class ChessStatsController {
             logger.error("Health check failed", e);
             Map<String, String> response = new HashMap<>();
             response.put("status", "down");
-            response.put("error", e.getMessage());
+            response.put("error", "Service unavailable");
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
         }
     }

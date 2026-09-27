@@ -48,7 +48,7 @@ public class ChessHistoryController {
         } catch (Exception e) {
             logger.error("Error getting month history", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Failed to fetch month history"));
         }
     }
 
@@ -69,7 +69,7 @@ public class ChessHistoryController {
         } catch (Exception e) {
             logger.error("Error getting current month history", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
+                    .body(Map.of("error", "Failed to fetch month history"));
         }
     }
 
@@ -90,7 +90,7 @@ public class ChessHistoryController {
             logger.error("Health check failed", e);
             Map<String, String> response = new HashMap<>();
             response.put("status", "down");
-            response.put("error", e.getMessage());
+            response.put("error", "Service unavailable");
             return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(response);
         }
     }
