@@ -18,7 +18,9 @@ public interface ChessDailyRatingRepository extends JpaRepository<ChessDailyRati
     Optional<ChessDailyRating> findByUsernameAndDate(String username, LocalDate date);
     
     List<ChessDailyRating> findByUsernameOrderByDateAsc(String username);
-    
+
+    Optional<ChessDailyRating> findTopByUsernameOrderByDateDesc(String username);
+
     @Query("SELECT d FROM ChessDailyRating d WHERE d.username = :username AND d.date >= :startDate ORDER BY d.date ASC")
     List<ChessDailyRating> findByUsernameAndDateAfter(@Param("username") String username,
                                                    @Param("startDate") LocalDate startDate);

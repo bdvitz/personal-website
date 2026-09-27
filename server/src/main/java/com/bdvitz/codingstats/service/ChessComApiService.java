@@ -1,7 +1,6 @@
 package com.bdvitz.codingstats.service;
 
 import com.bdvitz.codingstats.model.ChessStat;
-import com.bdvitz.codingstats.model.UserVerificationResponse;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
@@ -135,41 +134,6 @@ public class ChessComApiService {
         return gameStats;
     }
     
-    /**
-     * Get Chess.com user information including account creation date
-     * @throws HttpClientErrorException.NotFound if user doesn't exist
-     * @throws RuntimeException if Chess.com API is unreachable or timeout occurs
-     */
-    public UserVerificationResponse getUserInfo(String username) {
-        logger.info("Fetching user info for: {}", username);
-        try {
-            String userUrl = CHESS_COM_API_BASE + username;
-            String response = restTemplate.getForObject(userUrl, String.class);
-
-            if (response != null) {
-                JsonNode rootNode = objectMapper.readTree(response);
-                Long joinedTimestamp = rootNode.path("joined").asLong(0);
-
-                logger.info("User {} exists, joined timestamp: {}", username, joinedTimestamp);
-                return new UserVerificationResponse(true, username, joinedTimestamp);
-            }
-
-            // Response was null - treat as service unavailable
-            logger.warn("Received null response for user: {}", username);
-            throw new RuntimeException("Chess.com API returned null response");
-        } catch (HttpClientErrorException.NotFound e) {
-            logger.info("User not found: {}", username);
-            throw e; // Re-throw to be handled by controller
-        } catch (org.springframework.web.client.ResourceAccessException e) {
-            // Network timeout or connection error
-            logger.error("Network error or timeout checking user: {}", username, e);
-            throw new RuntimeException("Chess.com API is currently unavailable", e);
-        } catch (Exception e) {
-            logger.error("Error checking if user exists: {}", username, e);
-            throw new RuntimeException("Failed to verify user with Chess.com API", e);
-        }
-    }
-
     /**
      * Fetch list of available game archives for a user
      * @param username Chess.com username

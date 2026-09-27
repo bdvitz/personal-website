@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
 
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -29,7 +28,7 @@ public class ChessHistoryController {
     private ChessHistoryService chessHistoryService;
 
     /**
-     * Get rating history for a month (checks database first, falls back to API)
+     * Get stored rating history for a month (database only)
      * GET /api/chess/history/month?username=chess.username&year=2023&month=5
      */
     @GetMapping("/month")
@@ -48,56 +47,6 @@ public class ChessHistoryController {
             return ResponseEntity.ok(history);
         } catch (Exception e) {
             logger.error("Error getting month history", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    /**
-     * Fetch and update rating history for a month from Chess.com API
-     * POST /api/chess/history/refresh?username=chess.username&year=2023&month=5
-     */
-    @PostMapping("/refresh")
-    public ResponseEntity<?> refreshMonthHistory(
-            @RequestParam String username,
-            @RequestParam int year,
-            @RequestParam int month) {
-        try {
-            if (month < 1 || month > 12) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(Map.of("error", "Month must be between 1 and 12"));
-            }
-
-            logger.info("Refreshing history for user: {} for {}/{}", username, year, month);
-            List<ChessDailyRating> history = chessHistoryService.fetchAndUpdateMonthHistory(username, year, month);
-            return ResponseEntity.ok(history);
-        } catch (Exception e) {
-            logger.error("Error refreshing month history", e);
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", e.getMessage()));
-        }
-    }
-
-    /**
-     * Fetch month history for guest user without storing in database
-     * GET /api/chess/history/guest-month?username=example&year=2023&month=5
-     */
-    @GetMapping("/guest-month")
-    public ResponseEntity<?> fetchGuestMonthHistory(
-            @RequestParam String username,
-            @RequestParam int year,
-            @RequestParam int month) {
-        try {
-            if (month < 1 || month > 12) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
-                        .body(Map.of("error", "Month must be between 1 and 12"));
-            }
-
-            logger.info("Fetching guest history for user: {} for {}/{}", username, year, month);
-            List<ChessDailyRating> history = chessHistoryService.fetchMonthHistory(username, year, month);
-            return ResponseEntity.ok(history);
-        } catch (Exception e) {
-            logger.error("Error fetching guest month history", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", e.getMessage()));
         }

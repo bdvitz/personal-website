@@ -1,12 +1,13 @@
 package com.bdvitz.codingstats.service;
 
 import com.bdvitz.codingstats.model.ChessStat;
-import com.bdvitz.codingstats.model.UserVerificationResponse;
 import com.bdvitz.codingstats.repository.ChessStatRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.NoSuchElementException;
 
 @Service
 public class ChessStatsService {
@@ -31,12 +32,13 @@ public class ChessStatsService {
     }
     
     /**
-     * Get current chess statistics, retrieving from repository if available
-     * Otherwise fetch live stats from Chess.com API
+     * Get current chess statistics from the database only
+     * @throws NoSuchElementException if no stats are stored for the user
      */
     public ChessStat getCurrentStats(String username) {
         logger.info("Getting current stats for user: {}", username);
-        return chessStatRepository.findByUsername(username).orElse(fetchCurrentStats(username));
+        return chessStatRepository.findByUsername(username)
+                .orElseThrow(() -> new NoSuchElementException("No stored stats for user: " + username));
     }
 
     /**
@@ -63,13 +65,6 @@ public class ChessStatsService {
         logger.info("Fetching live chess.com api stats for user: {}", username);
         // Fetch stats from Chess.com API
         return chessComApiService.fetchChessStats(username);
-    }
-
-    /**
-     * Verify if a user exists on Chess.com and get account creation date
-     */
-    public UserVerificationResponse verifyUserExists(String username) {
-        return chessComApiService.getUserInfo(username);
     }
 
 }

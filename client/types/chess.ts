@@ -53,10 +53,3 @@ export interface CachedData {
     endMonth: number
   } | null
 }
-
-export interface UserVerificationResponse {
-  exists: boolean
-  username?: string
-  joinedTimestamp?: number
-  message?: string
-}

@@ -42,9 +42,8 @@ public class MemoryManagementFilter implements Filter {
      */
     private boolean shouldSuggestGc(String path) {
         // Suggest GC after memory-intensive operations
-        return path.contains("/api/chess/stats/history") ||
-               path.contains("/api/chess/stats/ratings-over-time") ||
-               path.contains("/fetch-month-history");
+        return path.startsWith("/api/chess/history/") ||
+               path.startsWith("/api/snapshot/");
     }
 
     /**

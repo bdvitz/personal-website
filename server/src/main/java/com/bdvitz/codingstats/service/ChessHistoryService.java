@@ -10,6 +10,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
@@ -21,6 +22,7 @@ public class ChessHistoryService {
 
     private static final Logger logger = LoggerFactory.getLogger(ChessHistoryService.class);
     private static final ZoneId UTC = ZoneOffset.UTC;
+    private static final long MONTH_FETCH_DELAY_MS = 500;
 
     private final ChessComApiService chessComApiService;
     private final ChessDailyRatingRepository dailyRatingRepository;
@@ -31,31 +33,69 @@ public class ChessHistoryService {
     }
 
     /**
-     * Get rating history for a month, retrieving from repository if user exists in database
-     * Otherwise fetch from Chess.com API (guest user)
+     * Get rating history for a month from the database only
      * @param username Chess.com username
      * @param year Year (e.g., 2023)
      * @param month Month (1-12)
-     * @return List of daily ratings for the month
+     * @return List of daily ratings for the month (empty if none stored)
      */
     public List<ChessDailyRating> getMonthHistory(String username, int year, int month) {
-        logger.info("Getting history for user: {} for {}/{}", username, year, month);
+        LocalDate startDate = LocalDate.of(year, month, 1);
+        LocalDate endDate = startDate.plusMonths(1).minusDays(1);
+        List<ChessDailyRating> history = dailyRatingRepository.findByUsernameAndDateBetween(username, startDate, endDate);
+        logger.info("Found {} records in database for {} {}/{}", history.size(), username, year, month);
+        return history;
+    }
 
-        // Check if user exists in database (has any historical data)
-        boolean userExists = dailyRatingRepository.existsByUsername(username);
+    /**
+     * Fetch and store every month from the month of the latest stored rating through the current month.
+     * Re-fetching the latest stored month picks up days added after the last sync. If nothing is stored yet,
+     * starts from the user's earliest Chess.com archive.
+     * @param username Chess.com username
+     * @return Number of daily ratings saved
+     */
+    public int syncHistorySinceLastStored(String username) {
+        YearMonth current = YearMonth.now(UTC);
+        YearMonth start = dailyRatingRepository.findTopByUsernameOrderByDateDesc(username)
+                .map(latest -> YearMonth.from(latest.getDate()))
+                .orElseGet(() -> findEarliestArchiveMonth(username).orElse(current));
 
-        if (userExists) {
-            // User exists in database, return data from DB (even if empty for this month)
-            LocalDate startDate = LocalDate.of(year, month, 1);
-            LocalDate endDate = startDate.plusMonths(1).minusDays(1);
-            List<ChessDailyRating> existingHistory = dailyRatingRepository.findByUsernameAndDateBetween(username, startDate, endDate);
-            logger.info("Found {} existing records in database for {}/{}", existingHistory.size(), year, month);
-            return existingHistory;
+        logger.info("Syncing history for user: {} from {} through {}", username, start, current);
+
+        int saved = 0;
+        for (YearMonth month = start; !month.isAfter(current); month = month.plusMonths(1)) {
+            saved += fetchAndUpdateMonthHistory(username, month.getYear(), month.getMonthValue()).size();
+
+            if (month.isBefore(current)) {
+                try {
+                    Thread.sleep(MONTH_FETCH_DELAY_MS); // stay well under Chess.com rate limits
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    break;
+                }
+            }
+        }
+        return saved;
+    }
+
+    /**
+     * Earliest month with games, parsed from archive URLs like ".../games/2020/06"
+     */
+    private Optional<YearMonth> findEarliestArchiveMonth(String username) {
+        JsonNode archives = chessComApiService.fetchAvailableArchives(username);
+        if (archives == null || archives.path("archives").isEmpty()) {
+            return Optional.empty();
         }
 
-        // User does not exist in database, fetch from API (guest user)
-        logger.info("User not found in database, fetching from API as guest");
-        return fetchMonthHistory(username, year, month);
+        String[] parts = archives.path("archives").get(0).asText().split("/");
+        try {
+            return Optional.of(YearMonth.of(
+                    Integer.parseInt(parts[parts.length - 2]),
+                    Integer.parseInt(parts[parts.length - 1])));
+        } catch (RuntimeException e) {
+            logger.warn("Could not parse earliest archive URL for user: {}", username);
+            return Optional.empty();
+        }
     }
 
     /**

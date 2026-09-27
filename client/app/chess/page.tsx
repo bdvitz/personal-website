@@ -9,52 +9,18 @@ import ServerHealthIndicator from './components/ServerHealthIndicator'
 import HistoricalDataFetcher from './components/HistoricalDataFetcher'
 import { useCachedChessData } from './components/hooks/useCachedChessData'
 import { loadSnapshotData } from './components/SnapshotLoader'
-import { getGuestStats, verifyChessComUser, checkServerHealth } from '@/lib/api'
+import { getChessStats, checkServerHealth } from '@/lib/api'
 import { ChessStats, ChessDailyRating } from '@/types/chess'
 
+// All data comes from the snapshot file or the database (refreshed nightly by the server).
+// The former guest "Search User" mode is documented in docs/removed-chess-guest-lookup.md.
 export default function ChessPage() {
   const DEFAULT_USERNAME = 'shia_justdoit'
+  const JOIN_DATE = '2020-06-09'
+  const FIRST_YEAR = 2020
 
-  // Pure helper: Get current date defaults
-  const getCurrentDateDefaults = () => {
-    const now = new Date()
-    return {
-      year: now.getFullYear(),
-      month: now.getMonth() + 1
-    }
-  }
-
-  // Pure helper: Get stored user initial state
-  const getStoredUserInitialState = () => {
-    const { year, month } = getCurrentDateDefaults()
-    return {
-      timeOption: 'all' as const,
-      customStartYear: 2020,
-      customStartMonth: 6,  // June 9, 2020 is the stored user's join date
-      customEndYear: year,
-      customEndMonth: month,
-      guestUsername: '',
-      searchUsername: '',
-      userVerified: false,
-      userJoinDate: null
-    }
-  }
-
-  // Pure helper: Get guest user initial state
-  const getGuestUserInitialState = () => {
-    const { year, month } = getCurrentDateDefaults()
-    return {
-      timeOption: 'all' as const,
-      customStartYear: 2010,
-      customStartMonth: 1,
-      customEndYear: year,
-      customEndMonth: month
-    }
-  }
-
-  // Cache hook (ACTIVE - not commented out)
   const cacheHook = useCachedChessData()
-  const { isCached, getCachedDataForRange, storeCachedData, clearCache } = cacheHook
+  const { isCached, getCachedDataForRange, storeCachedData } = cacheHook
 
   const [stats, setStats] = useState<ChessStats | null>(null)
   const [chartData, setChartData] = useState<any>(null)
@@ -66,19 +32,10 @@ export default function ChessPage() {
   // Custom range state
   const currentYear = new Date().getFullYear()
   const currentMonth = new Date().getMonth() + 1
-  const [customStartYear, setCustomStartYear] = useState(2010)
-  const [customStartMonth, setCustomStartMonth] = useState(1)
+  const [customStartYear, setCustomStartYear] = useState(FIRST_YEAR)
+  const [customStartMonth, setCustomStartMonth] = useState(6)
   const [customEndYear, setCustomEndYear] = useState(currentYear)
   const [customEndMonth, setCustomEndMonth] = useState(currentMonth)
-
-  // User mode: 'stored' for default user, 'guest' for custom lookups
-  const [userMode, setUserMode] = useState<'stored' | 'guest'>('stored')
-  const [guestUsername, setGuestUsername] = useState('')
-  const [searchUsername, setSearchUsername] = useState('')
-  const [verifying, setVerifying] = useState(false)
-  const [userVerified, setUserVerified] = useState(false)
-  const [userJoinDate, setUserJoinDate] = useState<Date | null>(null)
-  const [chartUsername, setChartUsername] = useState<string>('')
 
   // Fetching state for HistoricalDataFetcher component
   const [isFetching, setIsFetching] = useState(false)
@@ -86,7 +43,6 @@ export default function ChessPage() {
     username: string
     startDate: Date
     endDate: Date
-    dataSource: 'database' | 'update' | 'guest'
   } | null>(null)
 
   // Server health status
@@ -106,13 +62,7 @@ export default function ChessPage() {
       startDate = new Date(customStart.year, customStart.month - 1, 1)
       endDate = new Date(customEnd.year, customEnd.month, 0) // Last day of month
     } else if (option === 'all') {
-      // For stored user, use June 9, 2020 as the start date
-      // For guest users, use their join date if available, otherwise default to 2010
-      if (userMode === 'stored') {
-        startDate = new Date('2020-06-09')
-      } else {
-        startDate = userJoinDate ? new Date(userJoinDate) : new Date('2010-01-01')
-      }
+      startDate = new Date(JOIN_DATE)
     } else {
       const days = Number(option)
       startDate.setDate(startDate.getDate() - days)
@@ -158,14 +108,13 @@ export default function ChessPage() {
     }
   }
 
-  // Load snapshot data on mount for stored user
+  // Load snapshot data on mount, then replace stats with the database copy if the server is up
   const loadSnapshotOnMount = async () => {
     try {
       const snapshot = await loadSnapshotData(timeOption)
       if (snapshot) {
         setStats(snapshot.stats)
         setChartData(snapshot.chartData)
-        setChartUsername(DEFAULT_USERNAME)
         setUsingSnapshot(true)
 
         // Populate cache with snapshot data
@@ -178,18 +127,16 @@ export default function ChessPage() {
       console.error('Snapshot load failed:', err)
     }
 
-    // Then check server health and update if online
     const isOnline = await checkServerHealth(5000)
     setServerOnline(isOnline)
 
     if (isOnline) {
-      // Fetch fresh stats (don't wait for historical data)
       try {
-        const statsData = await getGuestStats(DEFAULT_USERNAME)
+        const statsData = await getChessStats(DEFAULT_USERNAME)
         setStats(statsData)
         setUsingSnapshot(false)
       } catch (err: any) {
-        console.error('Failed to fetch live stats:', err)
+        console.error('Failed to fetch stored stats:', err)
       }
     }
 
@@ -221,136 +168,29 @@ export default function ChessPage() {
     return true // Chart updated with empty data to show correct time range
   }
 
-  // Clear user data when switching modes
-  const clearUserData = () => {
-    setChartData(null)
-    setStats(null)
-    clearCache()
-    setChartUsername('')
-    setError(null)
-    setIsFetching(false)
-    setFetchParams(null)
-  }
-
-  // Switch to stored user mode
-  const switchToStoredUser = async () => {
-    clearUserData()
-
-    // Apply stored user defaults
-    const defaults = getStoredUserInitialState()
-    setUserMode('stored')
-    setTimeOption(defaults.timeOption)
-    setCustomStartYear(defaults.customStartYear)
-    setCustomStartMonth(defaults.customStartMonth)
-    setCustomEndYear(defaults.customEndYear)
-    setCustomEndMonth(defaults.customEndMonth)
-    setGuestUsername(defaults.guestUsername)
-    setSearchUsername(defaults.searchUsername)
-    setUserVerified(defaults.userVerified)
-    setUserJoinDate(defaults.userJoinDate)
-
-    // Load snapshot immediately
-    setLoading(true)
-    await loadSnapshotOnMount()
-  }
-
-  // Switch to guest user mode
-  const switchToGuestUser = () => {
-    clearUserData()
-
-    // Apply guest user defaults
-    const defaults = getGuestUserInitialState()
-    setUserMode('guest')
-    setTimeOption(defaults.timeOption)
-    setCustomStartYear(defaults.customStartYear)
-    setCustomStartMonth(defaults.customStartMonth)
-    setCustomEndYear(defaults.customEndYear)
-    setCustomEndMonth(defaults.customEndMonth)
-    setStats(null)
-  }
-
-  // Handle guest user verification
-  const handleGuestSearch = async () => {
-    if (!searchUsername.trim()) {
-      setError('Please enter a username')
-      return
-    }
-
-    setVerifying(true)
-    setError(null)
-    try {
-      const result = await verifyChessComUser(searchUsername.trim())
-
-      if (!result.exists) {
-        setError(result.message || 'User not found on Chess.com')
-        setUserVerified(false)
-        setUserJoinDate(null)
-        return
-      }
-
-      setGuestUsername(searchUsername.trim())
-      setUserMode('guest')
-      setUserVerified(true)
-
-      // Set the user's join date from the verification response
-      if (result.joinedTimestamp) {
-        const joinDate = new Date(result.joinedTimestamp * 1000) // Convert Unix timestamp (seconds) to milliseconds
-        setUserJoinDate(joinDate)
-        console.log('User joined Chess.com on:', joinDate.toLocaleDateString())
-      } else {
-        setUserJoinDate(null)
-      }
-
-      // Fetch current stats for guest user using guest-current endpoint
-      try {
-        const statsData = await getGuestStats(searchUsername.trim())
-        setStats(statsData)
-      } catch (err: any) {
-        console.error('Could not fetch guest stats:', err)
-      }
-    } catch (err: any) {
-      setError(err.message || 'Failed to verify user')
-      setUserVerified(false)
-      setUserJoinDate(null)
-    } finally {
-      setVerifying(false)
-    }
-  }
-
-  // Refresh current stats (same logic for both user types)
+  // Re-read current stats from the database
   const handleRefreshStats = async () => {
     setRefreshing(true)
     setError(null)
     try {
-      const username = userMode === 'stored' ? DEFAULT_USERNAME : guestUsername
-
-      // Use guest-current endpoint for both user types
-      const statsData = await getGuestStats(username)
+      const statsData = await getChessStats(DEFAULT_USERNAME)
       setStats(statsData)
-
-      // If successful and stored user, mark server as online
-      if (userMode === 'stored') {
-        setServerOnline(true)
-      }
+      setServerOnline(true)
+      setUsingSnapshot(false)
     } catch (err: any) {
       setError(err.message || 'Failed to refresh stats')
-
-      // If failed and stored user, mark server as potentially offline
-      if (userMode === 'stored') {
-        setServerOnline(false)
-      }
+      setServerOnline(false)
     } finally {
       setRefreshing(false)
     }
   }
 
-  // Load historical data from database (stored users only)
+  // Load historical data from database
   const handleLoadFromDatabase = async () => {
     // Check server health before fetching
     const isOnline = await checkServerHealth(5000)
     setServerOnline(isOnline)
 
-    const username = DEFAULT_USERNAME
     const { startDate, endDate } = calculateDateRange(
       timeOption,
       { year: customStartYear, month: customStartMonth },
@@ -360,86 +200,20 @@ export default function ChessPage() {
     if (!isOnline) {
       // Try to use cache if available
       if (isCached(startDate, endDate)) {
-        const success = refreshChartFromCache(timeOption)
-        if (success) {
-          setError('Server is offline. Please wait and try again.')
-          return
-        }
+        refreshChartFromCache(timeOption)
       }
-      // No cache available
       setError('Server is offline. Please wait and try again.')
       return
     }
 
     // Server online - trigger hybrid fetch
     setIsFetching(true)
-    setFetchParams({ username, startDate, endDate, dataSource: 'database' })
-  }
-
-  // Update database from Chess.com API (stored users only)
-  const handleUpdateFromApi = async () => {
-    // Check server health before fetching
-    const isOnline = await checkServerHealth(5000)
-    setServerOnline(isOnline)
-
-    if (!isOnline) {
-      setError('Server is offline. Please wait and try again.')
-      return
-    }
-
-    const username = DEFAULT_USERNAME
-    const { startDate, endDate } = calculateDateRange(
-      timeOption,
-      { year: customStartYear, month: customStartMonth },
-      { year: customEndYear, month: customEndMonth }
-    )
-
-    // Trigger fetch from Chess.com API and update database
-    setIsFetching(true)
-    setFetchParams({ username, startDate, endDate, dataSource: 'update' })
-  }
-
-  // Trigger historical data fetch for guest users
-  const handleRefresh = async () => {
-    // Check server health before fetching
-    if (userMode === 'stored') {
-      const isOnline = await checkServerHealth(5000)
-      setServerOnline(isOnline)
-
-      if (!isOnline) {
-        setError('Server is offline. Please wait and try again.')
-        return
-      }
-    }
-
-    const username = userMode === 'stored' ? DEFAULT_USERNAME : guestUsername
-    const { startDate, endDate } = calculateDateRange(
-      timeOption,
-      { year: customStartYear, month: customStartMonth },
-      { year: customEndYear, month: customEndMonth }
-    )
-
-    // Check cache first
-    if (isCached(startDate, endDate)) {
-      const success = refreshChartFromCache(timeOption)
-      if (success) {
-        console.log('Using cached data for this range')
-        return
-      }
-    }
-
-    // Not cached, trigger fetch (guest mode)
-    setIsFetching(true)
-    setFetchParams({ username, startDate, endDate, dataSource: 'guest' })
+    setFetchParams({ username: DEFAULT_USERNAME, startDate, endDate })
   }
 
   // Initial load
   useEffect(() => {
-    if (userMode === 'stored') {
-      loadSnapshotOnMount()
-    } else {
-      setLoading(false)
-    }
+    loadSnapshotOnMount()
   }, [])
 
   // Re-render chart when time period changes (use cache if available)
@@ -449,7 +223,7 @@ export default function ChessPage() {
     // Try to refresh from cache
     refreshChartFromCache(timeOption)
 
-    // If not in cache, user needs to click "Retrieve Historical Data"
+    // If not in cache, user needs to click "Load Rating from Database"
   }, [timeOption, customStartYear, customStartMonth, customEndYear, customEndMonth])
 
   if (loading) {
@@ -474,106 +248,39 @@ export default function ChessPage() {
           Chess Statistics
         </h1>
         <p className="text-xl text-purple-200">
-          {userMode === 'stored'
-            ? 'Track my Chess.com progress and ratings over time'
-            : `Viewing stats for: ${guestUsername}`}
+          Track my Chess.com progress and ratings over time
         </p>
       </div>
 
-      {/* User Mode Toggle */}
+      {/* User Mode Toggle (Search User is disabled) */}
       <div className="card bg-purple-900/40">
         <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
           <div className="flex gap-2">
             <button
-              onClick={switchToStoredUser}
-              className={`px-6 py-2 rounded-lg font-semibold transition-all duration-200 ${
-                userMode === 'stored'
-                  ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg'
-                  : 'bg-purple-800/30 text-purple-300 hover:bg-purple-800/50'
-              }`}
+              className="px-6 py-2 rounded-lg font-semibold transition-all duration-200 bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg"
             >
               <User className="w-4 h-4 inline mr-2" />
               My Stats
             </button>
             <button
-              onClick={switchToGuestUser}
-              className={`px-6 py-2 rounded-lg font-semibold transition-all duration-200 ${
-                userMode === 'guest'
-                  ? 'bg-gradient-to-r from-purple-500 to-purple-600 text-white shadow-lg'
-                  : 'bg-purple-800/30 text-purple-300 hover:bg-purple-800/50'
-              }`}
+              disabled
+              title="User search is currently unavailable"
+              className="px-6 py-2 rounded-lg font-semibold bg-gray-600/40 text-gray-400 cursor-not-allowed"
             >
               <Search className="w-4 h-4 inline mr-2" />
               Search User
             </button>
           </div>
-
-          {userMode === 'guest' && (
-            <div className="flex gap-2 w-full md:w-auto">
-              <input
-                type="text"
-                placeholder="Enter Chess.com username"
-                value={searchUsername}
-                onChange={(e) => setSearchUsername(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleGuestSearch()}
-                className="flex-1 md:w-64 bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200"
-              />
-              <button
-                onClick={handleGuestSearch}
-                disabled={verifying}
-                className="bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100"
-              >
-                {verifying ? 'Verifying...' : 'Verify User'}
-              </button>
-            </div>
-          )}
         </div>
 
-        {userMode === 'guest' && (
-          <div className="mt-4 text-sm text-purple-300 bg-purple-800/30 rounded-lg p-3">
-            <p className="font-semibold mb-2">How it works:</p>
-            <ul className="list-disc list-inside space-y-1 ml-2 mb-3">
-              <li>First, verify your Chess.com username using the button above</li>
-              <li>Select your desired time range below</li>
-              <li>Click "Update Rating from Chess.com" to fetch chess history</li>
-            </ul>
-            <p className="text-xs text-purple-200 italic">Note: This takes about 5 to 10 seconds per year of data to respect Chess.com's API rate limiting</p>
-          </div>
-        )}
-
-        {userMode === 'guest' && error && (
-          <div className="mt-4 bg-red-500/20 border border-red-400/50 rounded-lg p-4">
-            <p className="text-red-200">{error}</p>
-          </div>
-        )}
-
-        {userMode === 'guest' && userVerified && guestUsername && (
-          <div className="mt-4 bg-green-500/20 border border-green-400/50 rounded-lg p-4">
-            <p className="text-green-200">
-              ✓ User <strong>{guestUsername}</strong> verified successfully!
-              {userJoinDate && (
-                <span className="ml-1">
-                  (Joined: {userJoinDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })})
-                </span>
-              )}
-            </p>
-            <p className="text-green-200 text-sm mt-1">
-              You can now retrieve their chess statistics.
-            </p>
-          </div>
-        )}
-
         {/* Server Health Status */}
-        {userMode === 'stored' && (
-          <div className="mt-4">
-            <ServerHealthIndicator
-              serverOnline={serverOnline}
-              usingSnapshot={usingSnapshot}
-              userMode={userMode}
-              lastUpdated={stats?.lastUpdated}
-            />
-          </div>
-        )}
+        <div className="mt-4">
+          <ServerHealthIndicator
+            serverOnline={serverOnline}
+            usingSnapshot={usingSnapshot}
+            lastUpdated={stats?.lastUpdated}
+          />
+        </div>
       </div>
 
       {/* Controls */}
@@ -597,44 +304,20 @@ export default function ChessPage() {
           <div className="flex gap-3">
             <button
               onClick={handleRefreshStats}
-              disabled={refreshing || (userMode === 'guest' && !userVerified)}
+              disabled={refreshing}
               className="bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100 flex items-center space-x-2"
             >
               <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
               <span>Refresh Stats</span>
             </button>
-
-            {/* Stored user: Two buttons for database operations */}
-            {userMode === 'stored' ? (
-              <>
-                <button
-                  onClick={handleLoadFromDatabase}
-                  disabled={isFetching}
-                  className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100 flex items-center space-x-2"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isFetching && fetchParams?.dataSource === 'database' ? 'animate-spin' : ''}`} />
-                  <span>{isFetching && fetchParams?.dataSource === 'database' ? 'Loading...' : 'Load Rating from Database'}</span>
-                </button>
-                <button
-                  onClick={handleUpdateFromApi}
-                  disabled={isFetching}
-                  className="bg-gradient-to-r from-orange-500 to-orange-600 hover:from-orange-600 hover:to-orange-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100 flex items-center space-x-2"
-                >
-                  <RefreshCw className={`w-4 h-4 ${isFetching && fetchParams?.dataSource === 'update' ? 'animate-spin' : ''}`} />
-                  <span>{isFetching && fetchParams?.dataSource === 'update' ? 'Updating...' : 'Update Rating from Chess.com'}</span>
-                </button>
-              </>
-            ) : (
-              /* Guest user: Single button for API fetch */
-              <button
-                onClick={handleRefresh}
-                disabled={isFetching || !userVerified}
-                className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100 flex items-center space-x-2"
-              >
-                <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
-                <span>{isFetching ? 'Updating...' : 'Update Rating from Chess.com'}</span>
-              </button>
-            )}
+            <button
+              onClick={handleLoadFromDatabase}
+              disabled={isFetching}
+              className="bg-gradient-to-r from-purple-500 to-purple-600 hover:from-purple-600 hover:to-purple-700 disabled:from-gray-500 disabled:to-gray-600 text-white px-6 py-2 rounded-lg transition-all duration-200 font-semibold shadow-lg hover:shadow-xl transform hover:scale-105 disabled:scale-100 flex items-center space-x-2"
+            >
+              <RefreshCw className={`w-4 h-4 ${isFetching ? 'animate-spin' : ''}`} />
+              <span>{isFetching ? 'Loading...' : 'Load Rating from Database'}</span>
+            </button>
           </div>
         </div>
 
@@ -656,7 +339,7 @@ export default function ChessPage() {
                       disabled={refreshing || isFetching}
                       className="w-full bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200 disabled:opacity-50"
                     >
-                      {Array.from({ length: currentYear - 2010 + 1 }, (_, i) => 2010 + i).map((year) => (
+                      {Array.from({ length: currentYear - FIRST_YEAR + 1 }, (_, i) => FIRST_YEAR + i).map((year) => (
                         <option key={year} value={year}>{year}</option>
                       ))}
                     </select>
@@ -691,7 +374,7 @@ export default function ChessPage() {
                       disabled={refreshing || isFetching}
                       className="w-full bg-purple-800/50 text-white px-4 py-2 rounded-lg border border-purple-600/30 focus:border-purple-400 focus:outline-none transition-all duration-200 disabled:opacity-50"
                     >
-                      {Array.from({ length: currentYear - 2010 + 1 }, (_, i) => 2010 + i).map((year) => (
+                      {Array.from({ length: currentYear - FIRST_YEAR + 1 }, (_, i) => FIRST_YEAR + i).map((year) => (
                         <option key={year} value={year}>{year}</option>
                       ))}
                     </select>
@@ -722,18 +405,14 @@ export default function ChessPage() {
         startDate={fetchParams?.startDate || null}
         endDate={fetchParams?.endDate || null}
         isActive={isFetching}
-        dataSource={fetchParams?.dataSource || 'guest'}
-        useHybridFetch={userMode === 'stored'}
+        useHybridFetch
         cacheHook={cacheHook}
         onDataFetched={(data) => {
           const { startDate, endDate } = fetchParams!
           const newChartData = formatChartDataFromRatings(data, startDate, endDate)
           setChartData(newChartData)
-          setChartUsername(fetchParams!.username)
           setIsFetching(false)
-          if (userMode === 'stored') {
-            setUsingSnapshot(false)
-          }
+          setUsingSnapshot(false)
         }}
         onError={(err) => {
           setError(err)
@@ -745,8 +424,8 @@ export default function ChessPage() {
         }}
       />
 
-      {/* Error messages for stored users */}
-      {userMode === 'stored' && error && !stats && (
+      {/* Error messages */}
+      {error && !stats && (
         <div className="card max-w-2xl mx-auto">
           <div className="text-center">
             <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -763,7 +442,7 @@ export default function ChessPage() {
           </div>
         </div>
       )}
-      {userMode === 'stored' && error && stats && (
+      {error && stats && (
         <div className="bg-yellow-500/20 border border-yellow-400/50 rounded-lg p-4">
           <div className="flex items-start">
             <div className="flex-shrink-0">
@@ -780,7 +459,7 @@ export default function ChessPage() {
       )}
 
       {/* Current Ratings */}
-      {stats && (userMode === 'stored' || (userMode === 'guest' && userVerified)) && (
+      {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <StatsCard
             title="Rapid"
@@ -813,25 +492,21 @@ export default function ChessPage() {
       <div className="card">
         <h2 className="text-2xl font-bold text-white mb-6 flex items-center">
           <TrendingUp className="w-6 h-6 text-purple-400 mr-2" />
-          Rating Progression for {userMode === 'stored' ? 'Bryan Vitz' : chartUsername || 'User'}
+          Rating Progression for Bryan Vitz
         </h2>
         {chartData && chartData.labels.length > 0 ? (
           <RatingChart data={chartData} />
         ) : (
           <div className="text-center py-12">
             <p className="text-purple-200">
-              {userMode === 'guest' && guestUsername
-                ? 'Select a time range above and click "Update Rating from Chess.com" to fetch chess history.'
-                : userMode === 'guest'
-                ? 'Enter a Chess.com username above to get started.'
-                : 'No historical data available yet. Click "Update Rating from Chess.com" to fetch chess history.'}
+              No historical data loaded yet. Click "Load Rating from Database" to load chess history.
             </p>
           </div>
         )}
       </div>
 
-      {/* Game Statistics - Show for both stored and guest users */}
-      {stats && (userMode === 'stored' || (userMode === 'guest' && userVerified)) && (
+      {/* Game Statistics */}
+      {stats && (
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Win/Loss/Draw */}
           <div className="card">

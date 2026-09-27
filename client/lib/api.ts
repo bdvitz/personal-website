@@ -8,30 +8,20 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json' },
 })
 
-// Fetch current chess stats, auto-refresh if not found
+// All chess data is read from the database; the server refreshes it from Chess.com nightly.
+// Removed Chess.com passthrough calls are documented in docs/removed-chess-guest-lookup.md.
+
+// Fetch stored chess stats
 export const getChessStats = async (username: string) => {
   try {
     const response = await apiClient.get(`/api/chess/stats/current`, { params: { username } })
     return response.data
   } catch (error: any) {
-    if (error.response?.status === 404) {
-      return await refreshChessStats(username)
-    }
     throw new Error(error.response?.data?.error || 'Failed to fetch chess statistics')
   }
 }
 
-// Force refresh stats from Chess.com API
-export const refreshChessStats = async (username: string) => {
-  try {
-    const response = await apiClient.post(`/api/chess/stats/refresh`, null, { params: { username } })
-    return response.data
-  } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to refresh chess statistics')
-  }
-}
-
-// Get rating history for a single month (checks DB first for stored users, falls back to API)
+// Get stored rating history for a single month
 export const getMonthHistory = async (username: string, year: number, month: number) => {
   try {
     const response = await apiClient.get(`/api/chess/history/month`, {
@@ -40,76 +30,6 @@ export const getMonthHistory = async (username: string, year: number, month: num
     return response.data
   } catch (error: any) {
     throw new Error(error.response?.data?.error || 'Failed to fetch month history')
-  }
-}
-
-// Fetch rating history for a single month from Chess.com API (guest users)
-export const fetchMonthHistory = async (username: string, year: number, month: number) => {
-  try {
-    const response = await apiClient.get(`/api/chess/history/guest-month`, {
-      params: { username, year, month },
-      timeout: 30000, // 30 second timeout
-    })
-    return response.data
-  } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to fetch guest month history')
-  }
-}
-
-// Fetch and update rating history from Chess.com API to database (stored users)
-export const refreshMonthHistory = async (username: string, year: number, month: number) => {
-  try {
-    const response = await apiClient.post(`/api/chess/history/refresh`, null, {
-      params: { username, year, month },
-      timeout: 30000, // 30 second timeout for API fetch
-    })
-    return response.data
-  } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to refresh month history from Chess.com')
-  }
-}
-
-// Verify Chess.com user exists via server endpoint
-export const verifyChessComUser = async (username: string) => {
-  try {
-    const response = await apiClient.get(`/api/chess/stats/verify`, {
-      params: { username },
-      timeout: 2000 // 2 second timeout
-    })
-    return {
-      exists: response.data.exists,
-      username: response.data.username,
-      joinedTimestamp: response.data.joinedTimestamp,
-      message: response.data.message
-    }
-  } catch (error: any) {
-    // Check if it's a timeout or network error (server offline)
-    if (error.code === 'ECONNABORTED' || error.code === 'ERR_NETWORK' || !error.response) {
-      throw new Error('Server is currently offline. Please try again later.')
-    }
-
-    // Check if user doesn't exist (404)
-    if (error.response?.status === 404) {
-      throw new Error(`User '${username}' does not exist on Chess.com`)
-    }
-
-    // Check if service is unavailable (503)
-    if (error.response?.status === 503) {
-      throw new Error('Server is currently offline. Please try again later.')
-    }
-
-    // Generic error for other cases
-    throw new Error(error.response?.data?.error || 'Failed to verify user')
-  }
-}
-
-// Fetch current stats for guest user without storing in database
-export const getGuestStats = async (username: string) => {
-  try {
-    const response = await apiClient.get(`/api/chess/stats/guest-current`, { params: { username } })
-    return response.data
-  } catch (error: any) {
-    throw new Error(error.response?.data?.error || 'Failed to fetch guest statistics. Unable to connect to server and make api requests.')
   }
 }
 

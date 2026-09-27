@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { X } from 'lucide-react'
-import { fetchMonthHistory, getMonthHistory, refreshMonthHistory } from '@/lib/api'
+import { getMonthHistory } from '@/lib/api'
 import { ChessDailyRating } from '@/types/chess'
 import type { UseCachedChessDataReturn } from './hooks/useCachedChessData'
 
@@ -11,7 +11,6 @@ interface HistoricalDataFetcherProps {
   startDate: Date | null
   endDate: Date | null
   isActive: boolean
-  dataSource?: 'database' | 'update' | 'guest' // 'database' = read from DB, 'update' = fetch from API & update DB, 'guest' = fetch from API only
   useHybridFetch?: boolean // If true, use cached data and only fetch from last cached month onwards
   cacheHook: UseCachedChessDataReturn
   onDataFetched: (data: ChessDailyRating[]) => void
@@ -24,7 +23,6 @@ export default function HistoricalDataFetcher({
   startDate,
   endDate,
   isActive,
-  dataSource = 'guest',
   useHybridFetch = false,
   cacheHook,
   onDataFetched,
@@ -67,23 +65,7 @@ export default function HistoricalDataFetcher({
 
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        let monthData: ChessDailyRating[]
-
-        // Choose API function based on dataSource
-        switch (dataSource) {
-          case 'database':
-            monthData = await getMonthHistory(user, year, month)
-            break
-          case 'update':
-            monthData = await refreshMonthHistory(user, year, month)
-            break
-          case 'guest':
-          default:
-            monthData = await fetchMonthHistory(user, year, month)
-            break
-        }
-
-        return monthData
+        return await getMonthHistory(user, year, month)
       } catch (error: any) {
         lastError = error
         console.warn(`Attempt ${attempt}/${maxRetries} failed for ${year}-${month.toString().padStart(2, '0')}: ${error.message}`)
@@ -234,26 +216,13 @@ export default function HistoricalDataFetcher({
     return null
   }
 
-  // Determine loading message based on data source
-  const getLoadingMessage = () => {
-    switch (dataSource) {
-      case 'database':
-        return 'Loading from database...'
-      case 'update':
-        return 'Updating from Chess.com API...'
-      case 'guest':
-      default:
-        return 'Loading chess history...'
-    }
-  }
-
   return (
     <div className="card bg-blue-900/30 border border-blue-500/50">
       <div className="flex items-center space-x-4">
         <div className="w-12 h-12 border-4 border-blue-400 border-t-transparent rounded-full animate-spin"></div>
         <div className="flex-1">
           <h3 className="text-blue-200 font-semibold text-lg mb-1">
-            {getLoadingMessage()}
+            Loading from database...
           </h3>
           <p className="text-blue-300 text-sm">
             Processing month {fetchProgress.current} of {fetchProgress.total} ({fetchProgress.currentMonth})
