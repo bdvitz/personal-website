@@ -41,7 +41,7 @@ echo "NEXT_PUBLIC_API_URL=http://localhost:8080" > .env.local
 ```bash
 # Terminal 1: Backend
 cd server
-mvn spring-boot:run -Dspring-boot.run.profiles=local
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"
 
 # Terminal 2: Frontend
 cd client
@@ -101,7 +101,7 @@ git status
 
 ### "Access denied for user" error
 - Check `application-local.properties` has correct Railway credentials
-- Verify you're running with: `mvn spring-boot:run -Dspring-boot.run.profiles=local`
+- Verify you're running with: `mvn spring-boot:run "-Dspring-boot.run.profiles=local"`
 
 ### Frontend can't connect to backend
 - Check `.env.local` exists with correct API URL

@@ -48,8 +48,8 @@ chess.username=your_chess_username
 
 ```bash
 mvn clean install
-mvn spring-boot:run -Dspring-boot.run.profiles=local  # local properties only
-mvn spring-boot:run -Dspring-boot.run.profiles=local,debug  # local and debug properties, overridden by last called
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"  # local properties only
+mvn spring-boot:run "-Dspring-boot.run.profiles=local,debug"  # local and debug properties, overridden by last called
 # mvn spring-boot:run
 ```
 
@@ -207,7 +207,7 @@ src/main/java/com/bdvitz/codingstats/
 ### Run in Development Mode
 
 ```bash
-mvn spring-boot:run -Dspring-boot.run.profiles=dev
+mvn spring-boot:run "-Dspring-boot.run.profiles=dev"
 ```
 
 ### Enable Debug Logging

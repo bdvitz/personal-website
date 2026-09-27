@@ -1,5 +1,6 @@
 import { Code, Blocks, Trophy } from 'lucide-react'
 import Link from 'next/link'
+import Balloon from '@/components/icons/Balloon'
 
 export default function Home() {
   return (
@@ -54,6 +55,19 @@ export default function Home() {
           </div>
         </Link>
 
+        <Link href="/party">
+          <div className="card card-hover group cursor-pointer">
+            <Balloon className="w-16 h-16 text-pink-400 mb-4 group-hover:scale-110 transition-transform duration-300" />
+            <h2 className="text-3xl font-bold text-white mb-3">Party Games</h2>
+            <p className="text-purple-200 leading-relaxed">
+              Jackbox-style games for a group: host a room on the TV, and everyone joins from their phone with a 4-letter code
+            </p>
+            <div className="mt-6 inline-flex items-center text-pink-400 font-semibold group-hover:translate-x-2 transition-transform duration-200">
+              Host or Join →
+            </div>
+          </div>
+        </Link>
+
       </div>
 
       {/* About Section */}
@@ -67,6 +81,7 @@ export default function Home() {
             <li>Algorithm solutions including LeetCode and Project Euler challenges</li>
             <li>Refreshable Chess.com statistics tracking using Railway PostgreSQL</li>
             <li>Rubik's Cube hobby and art mosaics</li>
+            <li>Real-time multiplayer party games played from your phone</li>
           </ul>
           <p>
             Built with <span className="font-semibold text-white">Next.js</span>, <span className="font-semibold text-white">Spring Boot</span>, and <span className="font-semibold text-white">PostgreSQL</span>.
@@ -94,6 +109,7 @@ export default function Home() {
               <li>• Spring Boot 3</li>
               <li>• PostgreSQL</li>
               <li>• Chess.com API</li>
+              <li>• WebSockets</li>
               <li>• Railway Hosting</li>
             </ul>
           </div>

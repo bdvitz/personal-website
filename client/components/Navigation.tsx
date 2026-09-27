@@ -4,6 +4,7 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Code, Blocks, Trophy, Home, Menu, X } from 'lucide-react'
+import Balloon from '@/components/icons/Balloon'
 
 export default function Navigation() {
   const pathname = usePathname()
@@ -13,7 +14,8 @@ export default function Navigation() {
     { href: '/', label: 'Home', icon: Home, gradient: 'from-purple-500 to-purple-600' },
     { href: '/algorithms', label: 'Algorithms', icon: Code, gradient: 'from-green-500 to-green-600' },
     { href: '/chess', label: 'Chess', icon: Trophy, gradient: 'from-yellow-500 to-yellow-600' },
-    { href: '/cubing', label: "Cubing", icon: Blocks, gradient: 'from-red-500 to-red-600' }
+    { href: '/cubing', label: "Cubing", icon: Blocks, gradient: 'from-red-500 to-red-600' },
+    { href: '/party', label: 'Party', icon: Balloon, gradient: 'from-pink-500 to-pink-600' }
   ]
 
   return (

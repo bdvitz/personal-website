@@ -9,11 +9,13 @@ client/                      Next.js 16 App Router, TS (strict off), Tailwind, `
   app/algorithms/            Markdown articles from client/content/algorithms/*.md (gray-matter, KaTeX)
   app/chess/                 Chess stats page (see skill: chess-stats)
   app/cubing/, cubing/mosaic Rubik's cube mosaic tool (client-only; logic in lib/mosaic/)
+  app/party/                 Party games: landing, host/[code] (TV), play/[code] (phone); lib/party/, components/party/ (see skill: party-games)
   components/Navigation.tsx  Nav items array - add new top-level pages here
   lib/api.ts                 All backend calls (axios, NEXT_PUBLIC_API_URL)
   types/chess.ts
 server/                      Spring Boot 3.2, Java 21, package com.bdvitz.codingstats
   controller/ service/ repository/ model/ scheduler/ config/
+  party/                     In-memory rooms + WebSocket /ws/party (self-contained feature package)
 scripts/update-snapshot.sh   Regenerates client/public/data/stored-user-snapshot.json
 ```
 
@@ -28,12 +30,12 @@ scripts/update-snapshot.sh   Regenerates client/public/data/stored-user-snapshot
 
 ## Commands
 - Client: `cd client && npm run build` (best type/compile check), `npm run dev`, `npm run lint`
-- Server: `cd server && mvn -q clean compile` (compile check), `mvn spring-boot:run -Dspring-boot.run.profiles=local`
-- There are no automated tests in either app; verify with build/compile.
+- Server: `cd server && mvn -q clean compile` (compile check), `mvn spring-boot:run "-Dspring-boot.run.profiles=local"`
+- Tests: only the party package has them (`cd server && mvn test`, JUnit + Mockito, no DB). Otherwise verify with build/compile.
 - Local secrets: `server/src/main/resources/application-local.properties`, `client/.env.local` (both gitignored - never commit).
 
 ## Constraints that shape design
-- Railway free tier, 500 MB RAM. application.properties caps: Hikari pool 3, Tomcat `threads.max=20`, `max-connections=20`, `lazy-initialization=true`. Anything long-lived (WebSockets) must account for these.
+- Railway free tier, 500 MB RAM. application.properties caps: Hikari pool 3, Tomcat `threads.max=20`, `max-connections=100` (raised for party WebSockets), `lazy-initialization=true`. Anything long-lived must account for these.
 - Server may cold-start/sleep; frontend is designed to render from static snapshot first.
 - JPA `ddl-auto=update` - adding entity fields alters tables automatically; no migrations.
 - No auth anywhere. Any public endpoint is callable by anyone; don't expose endpoints that trigger outbound API calls or heavy work.
@@ -44,4 +46,4 @@ scripts/update-snapshot.sh   Regenerates client/public/data/stored-user-snapshot
 
 ## Current initiative (2026-09)
 1. Chess: DONE and deployed (merged to `main`). Clients read DB/snapshot only, and the nightly/startup job refreshes stats + daily history. Deferred: automating snapshot regeneration.
-2. Party games for Bryan's 30th birthday, added to this same deployment under `/party`. Details in `party-games` skill.
+2. Party games for Bryan's 30th birthday, added to this same deployment under `/party`. Room framework + practice games `warmup` and `mostlikely` built; next is the prisoner's dilemma. Details in `party-games` skill.

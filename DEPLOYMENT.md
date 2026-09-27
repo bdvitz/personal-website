@@ -54,7 +54,7 @@ The frontend uses `.env` files:
 3. **Run the backend with the local profile:**
    ```bash
    cd server
-   mvn spring-boot:run -Dspring-boot.run.profiles=local
+   mvn spring-boot:run "-Dspring-boot.run.profiles=local"
    ```
 
 ### Step 2: Frontend Configuration
@@ -187,7 +187,7 @@ Before deploying, verify:
 
 **Local Development:**
 - Check `application-local.properties` exists and has correct Railway credentials
-- Run with: `mvn spring-boot:run -Dspring-boot.run.profiles=local`
+- Run with: `mvn spring-boot:run "-Dspring-boot.run.profiles=local"`
 
 **Production (Railway):**
 - Verify environment variables are set in Railway dashboard
@@ -220,7 +220,7 @@ Before deploying, verify:
 ```bash
 # Terminal 1: Backend
 cd server
-mvn spring-boot:run -Dspring-boot.run.profiles=local
+mvn spring-boot:run "-Dspring-boot.run.profiles=local"
 
 # Terminal 2: Frontend
 cd client

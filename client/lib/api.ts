@@ -80,4 +80,39 @@ export const checkServerHealth = async (timeoutMs: number = 5000): Promise<boole
   }
 }
 
+// ---- Party games (room create/lookup over REST; gameplay over the WebSocket) ----
+
+export const PARTY_WS_URL = API_BASE_URL.replace(/^http/, 'ws') + '/ws/party'
+
+const partyError = (error: any, fallback: string): ApiError => {
+  if (!error.response) {
+    return new ApiError(SERVER_OFFLINE_MESSAGE, true)
+  }
+  // Party errors are written for players (room full, rate limited...), so show them
+  return new ApiError(error.response.data?.error || fallback, false)
+}
+
+// Passing this browser's previous room closes it first (one room per host browser)
+export const createPartyRoom = async (
+  previous?: { previousCode: string; previousHostToken: string }
+): Promise<{ code: string; hostToken: string }> => {
+  try {
+    const response = await apiClient.post('/api/party/rooms', previous ?? {})
+    return response.data
+  } catch (error: any) {
+    throw partyError(error, 'Could not create a room. Please try again.')
+  }
+}
+
+// Returns null when no room has that code
+export const getPartyRoom = async (code: string): Promise<{ code: string; status: string; playerCount: number; maxPlayers: number } | null> => {
+  try {
+    const response = await apiClient.get(`/api/party/rooms/${encodeURIComponent(code)}`)
+    return response.data
+  } catch (error: any) {
+    if (error.response?.status === 404) return null
+    throw partyError(error, 'Could not look up that room. Please try again.')
+  }
+}
+
 export default apiClient
