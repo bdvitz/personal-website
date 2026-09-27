@@ -4,15 +4,16 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import QRCode from 'react-qr-code'
-import { DoorClosed, Home, Loader2, SkipForward, Square, WifiOff } from 'lucide-react'
+import { DoorClosed, Home, SkipForward, Square, WifiOff } from 'lucide-react'
 import { usePartySocket } from '@/lib/party/usePartySocket'
 import { PARTY_GAMES } from '@/components/party/games/registry'
 import GamePicker from '@/components/party/GamePicker'
 import PlayerList from '@/components/party/PlayerList'
+import ConnectingNotice from '@/components/party/ConnectingNotice'
 
 export default function PartyHostPage() {
   const code = String(useParams().code ?? '').toUpperCase()
-  const { status, state, error, endedReason, clockOffset, send } = usePartySocket(code, 'host')
+  const { status, state, error, endedReason, clockOffset, unreachable, send } = usePartySocket(code, 'host')
   const [joinUrl, setJoinUrl] = useState('')
 
   useEffect(() => {
@@ -31,11 +32,7 @@ export default function PartyHostPage() {
   }
 
   if (!state) {
-    return (
-      <div className="flex items-center justify-center gap-3 py-24 text-purple-200">
-        <Loader2 className="h-6 w-6 animate-spin" /> Connecting to room {code}...
-      </div>
-    )
+    return <ConnectingNotice code={code} unreachable={unreachable} />
   }
 
   const { room, game } = state
@@ -55,7 +52,7 @@ export default function PartyHostPage() {
     <div className="space-y-4">
       {status === 'reconnecting' && (
         <div className="flex items-center justify-center gap-2 rounded-lg bg-yellow-500/20 px-4 py-2 text-yellow-100">
-          <WifiOff className="h-4 w-4" /> Reconnecting...
+          <WifiOff className="h-4 w-4" /> {unreachable ? "Can't reach the game server. Still trying..." : 'Reconnecting...'}
         </div>
       )}
       {error && <div className="rounded-lg bg-red-500/20 px-4 py-2 text-center text-red-100">{error}</div>}

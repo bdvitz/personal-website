@@ -3,15 +3,16 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
-import { Crown, Home, Hourglass, Loader2, LogIn, SkipForward, Undo2, WifiOff } from 'lucide-react'
+import { Crown, Home, Hourglass, LogIn, SkipForward, Undo2, WifiOff } from 'lucide-react'
 import { usePartySocket } from '@/lib/party/usePartySocket'
 import { PARTY_GAMES } from '@/components/party/games/registry'
 import GamePicker from '@/components/party/GamePicker'
 import PlayerList from '@/components/party/PlayerList'
+import ConnectingNotice from '@/components/party/ConnectingNotice'
 
 export default function PartyPlayPage() {
   const code = String(useParams().code ?? '').toUpperCase()
-  const { status, state, error, endedReason, needsName, clockOffset, send, join, sendInput } = usePartySocket(code, 'player')
+  const { status, state, error, endedReason, needsName, clockOffset, unreachable, send, join, sendInput } = usePartySocket(code, 'player')
   const [name, setName] = useState('')
   const autoJoined = useRef(false)
 
@@ -41,7 +42,7 @@ export default function PartyPlayPage() {
     <>
       {status === 'reconnecting' && (
         <div className="flex items-center justify-center gap-2 rounded-lg bg-yellow-500/20 px-4 py-2 text-yellow-100">
-          <WifiOff className="h-4 w-4" /> Reconnecting...
+          <WifiOff className="h-4 w-4" /> {unreachable ? "Can't reach the game server. Still trying..." : 'Reconnecting...'}
         </div>
       )}
       {error && <div className="rounded-lg bg-red-500/20 px-4 py-2 text-center text-red-100">{error}</div>}
@@ -76,11 +77,7 @@ export default function PartyPlayPage() {
   }
 
   if (!state?.you) {
-    return (
-      <div className="flex items-center justify-center gap-3 py-24 text-purple-200">
-        <Loader2 className="h-6 w-6 animate-spin" /> Connecting to room {code}...
-      </div>
-    )
+    return <ConnectingNotice code={code} unreachable={unreachable} />
   }
 
   const { room, you, game } = state

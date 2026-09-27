@@ -9,6 +9,7 @@ type Role = 'host' | 'player'
 const PING_INTERVAL_MS = 25_000 // keeps Railway's proxy and the server's 90s idle timeout happy
 const MAX_BACKOFF_MS = 10_000
 const ERROR_DISPLAY_MS = 4_000
+const UNREACHABLE_AFTER_ATTEMPTS = 4 // ~15s of failed reconnects (1+2+4+8s)
 
 export const hostTokenKey = (code: string) => `party-host:${code}`
 // Code of the room this browser is hosting, for "Return to room" and one-room-per-browser
@@ -39,6 +40,8 @@ export function usePartySocket(code: string, role: Role) {
   const [endedReason, setEndedReason] = useState<string | null>(null)
   const [needsName, setNeedsName] = useState(false)
   const [clockOffset, setClockOffset] = useState(0)
+  // Several connects in a row failed: show an error instead of an endless spinner (retries continue)
+  const [unreachable, setUnreachable] = useState(false)
 
   const wsRef = useRef<WebSocket | null>(null)
   const endedRef = useRef(false)
@@ -81,6 +84,7 @@ export function usePartySocket(code: string, role: Role) {
 
     ws.onopen = () => {
       attemptRef.current = 0
+      setUnreachable(false)
       setStatus('open')
       if (role === 'host') {
         const hostToken = storage.get(hostTokenKey(code))
@@ -144,6 +148,7 @@ export function usePartySocket(code: string, role: Role) {
       setStatus('reconnecting')
       const delay = Math.min(1000 * 2 ** attemptRef.current, MAX_BACKOFF_MS)
       attemptRef.current += 1
+      if (attemptRef.current >= UNREACHABLE_AFTER_ATTEMPTS) setUnreachable(true)
       if (reconnectTimer.current) clearTimeout(reconnectTimer.current)
       reconnectTimer.current = setTimeout(connect, delay)
     }
@@ -192,6 +197,7 @@ export function usePartySocket(code: string, role: Role) {
     endedReason,
     needsName,
     clockOffset,
+    unreachable,
     send,
     join,
     sendInput,

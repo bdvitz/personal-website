@@ -1,6 +1,8 @@
 import axios from 'axios'
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080'
+// Trailing slashes stripped: axios tolerates "host/" + "/path", but the WebSocket URL
+// would become "host//ws/party", which the server answers with 404
+const API_BASE_URL = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8080').replace(/\/+$/, '')
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
