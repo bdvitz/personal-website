@@ -31,7 +31,7 @@ public interface PartyGame {
      */
     boolean onInput(Player player, JsonNode input, long now);
 
-    /** Called about once a second; enforce phase deadlines here. */
+    /** Called every ~250ms; enforce phase deadlines here. */
     boolean onTick(long now);
 
     /** Host or VIP pressed "Next" (skip a timer or leave a reveal screen). */
@@ -39,6 +39,14 @@ public interface PartyGame {
 
     /** A player was kicked from the room mid-game. */
     default void onPlayerRemoved(Player player) {}
+
+    /**
+     * True for games with private scores: while this game runs, room state omits every player's
+     * score (TV included) and each phone only gets its own score in {@code you.score}.
+     */
+    default boolean hidesScores() {
+        return false;
+    }
 
     /** Payload for the TV screen. Must be JSON-serializable. */
     Object hostView();

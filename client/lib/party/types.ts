@@ -6,7 +6,7 @@ export interface PartyPlayer {
   id: string
   name: string
   connected: boolean
-  score: number
+  score?: number // omitted during private-score games (e.g. colordilemma)
 }
 
 export interface RoomView {
@@ -25,6 +25,7 @@ export interface YouView {
   name: string
   waiting: boolean
   vip: boolean
+  score?: number // your own room total; always sent
 }
 
 export interface PartyState {

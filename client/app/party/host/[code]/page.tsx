@@ -90,10 +90,12 @@ export default function PartyHostPage() {
           )}
 
           {room.status === 'IN_GAME' && (
-            <div className="card grid grid-cols-2 gap-2">
-              <button type="button" onClick={() => send({ type: 'advance' })} className="btn-primary flex items-center justify-center gap-2">
-                <SkipForward className="h-5 w-5" /> Next
-              </button>
+            <div className={`card grid gap-2 ${definition?.automatic ? 'grid-cols-1' : 'grid-cols-2'}`}>
+              {!definition?.automatic && (
+                <button type="button" onClick={() => send({ type: 'advance' })} className="btn-primary flex items-center justify-center gap-2">
+                  <SkipForward className="h-5 w-5" /> Next
+                </button>
+              )}
               <button
                 type="button"
                 onClick={() => confirm('End this game and return to the lobby?') && send({ type: 'backToLobby' })}

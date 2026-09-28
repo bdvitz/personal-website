@@ -7,11 +7,12 @@ import java.util.function.Supplier;
 /** Game ids the host can start. Add new games here and in client/components/party/games/registry.tsx. */
 public final class GameRegistry {
 
-    public static final String DEFAULT_ID = WarmupGame.ID;
+    public static final String DEFAULT_ID = ColorDilemmaGame.ID; // the main party game
 
     private static final Map<String, Supplier<PartyGame>> GAMES = Map.of(
             WarmupGame.ID, WarmupGame::new,
-            MostLikelyGame.ID, MostLikelyGame::new
+            MostLikelyGame.ID, MostLikelyGame::new,
+            ColorDilemmaGame.ID, ColorDilemmaGame::new
     );
 
     private GameRegistry() {}

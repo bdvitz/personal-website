@@ -46,4 +46,4 @@ scripts/update-snapshot.sh   Regenerates client/public/data/stored-user-snapshot
 
 ## Current initiative (2026-09)
 1. Chess: DONE and deployed (merged to `main`). Clients read DB/snapshot only, and the nightly/startup job refreshes stats + daily history. Deferred: automating snapshot regeneration.
-2. Party games for Bryan's 30th birthday, added to this same deployment under `/party`. Room framework + practice games `warmup` and `mostlikely` built; next is the prisoner's dilemma. Details in `party-games` skill.
+2. Party games for Bryan's 30th birthday, added to this same deployment under `/party`. Framework deployed; Color Dilemma (`colordilemma`) built, plus practice games `warmup`/`mostlikely`. Details in `party-games` skill.

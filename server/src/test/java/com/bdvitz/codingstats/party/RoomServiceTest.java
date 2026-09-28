@@ -154,7 +154,7 @@ class RoomServiceTest {
     @Test
     void midGameJoinerWaitsWithoutGameViewAndIsSeatedNextGame() throws Exception {
         Client alice = join("Alice");
-        service.start(alice.session, null);
+        service.start(alice.session, "warmup"); // solo-friendly game
         Client late = join("Late");
         assertTrue(late.state().path("you").path("waiting").asBoolean());
         assertTrue(late.state().path("game").isMissingNode());
@@ -217,7 +217,7 @@ class RoomServiceTest {
         Client host = host();
         assertEquals("UNKNOWN_GAME", code(() -> service.selectGame(host.session, "nope")));
         assertEquals("UNKNOWN_GAME", code(() -> service.start(host.session, "nope")));
-        assertEquals("warmup", host.state().path("room").path("selectedGameId").asText());
+        assertEquals("colordilemma", host.state().path("room").path("selectedGameId").asText(), "default game");
     }
 
     @Test
@@ -259,6 +259,31 @@ class RoomServiceTest {
         assertEquals("NOT_ALLOWED", code(() -> service.resetScores(alice.session)), "VIP can't reset scores");
         service.resetScores(host.session);
         assertEquals(0, alice.state().path("room").path("players").get(0).path("score").asInt());
+    }
+
+    @Test
+    void colorDilemmaNeedsTwoPlayersAndRefusalLeavesRoomInLobby() throws Exception {
+        Client host = host();
+        join("Alice");
+        assertEquals("NOT_ENOUGH_PLAYERS", code(() -> service.start(host.session, null)));
+        assertEquals("LOBBY", host.state().path("room").path("status").asText());
+    }
+
+    @Test
+    void privateScoreGameHidesEveryonesScoresExceptYourOwn() throws Exception {
+        Client host = host();
+        Client alice = join("Alice");
+        Client bob = join("Bob");
+        service.start(host.session, "colordilemma");
+        for (Client c : List.of(host, alice, bob)) {
+            c.state().path("room").path("players")
+                    .forEach(p -> assertTrue(p.path("score").isMissingNode(), "no scores in room state mid-game"));
+        }
+        assertEquals(0, alice.state().path("you").path("score").asInt(), "own score still sent");
+
+        service.backToLobby(host.session);
+        host.state().path("room").path("players")
+                .forEach(p -> assertFalse(p.path("score").isMissingNode(), "scores visible again in the lobby"));
     }
 
     @Test

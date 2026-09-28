@@ -29,7 +29,7 @@ export default function PlayerList({ room, highlightIds, onKick, onMakeVip, show
         {p.id === room.vipPlayerId && <Crown className="h-4 w-4 shrink-0 text-yellow-300" aria-label="VIP" />}
         {waiting && <span className="text-xs text-purple-300">next game</span>}
         <span className="ml-auto flex items-center gap-2">
-          {showScores && !waiting && <span className="tabular-nums text-purple-200">{p.score}</span>}
+          {showScores && !waiting && p.score !== undefined && <span className="tabular-nums text-purple-200">{p.score}</span>}
           {onMakeVip && p.id !== room.vipPlayerId && (
             <button
               type="button"

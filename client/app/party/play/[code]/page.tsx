@@ -81,7 +81,6 @@ export default function PartyPlayPage() {
   }
 
   const { room, you, game } = state
-  const me = room.players.find((p) => p.id === you.playerId)
   const definition = room.gameId ? PARTY_GAMES[room.gameId] : undefined
   const upNext = room.selectedGameId ? PARTY_GAMES[room.selectedGameId] : undefined
   const picker = (
@@ -128,13 +127,13 @@ export default function PartyPlayPage() {
           {you.name}
         </span>
         <span className="text-sm text-purple-200">
-          {room.code}{me ? ` · ${me.score} pts` : ''}
+          {room.code}{you.score !== undefined ? ` · ${you.score} pts` : ''}
         </span>
       </div>
 
       <div className="card">{body}</div>
 
-      {you.vip && room.status === 'IN_GAME' && (
+      {you.vip && room.status === 'IN_GAME' && !definition?.automatic && (
         <button type="button" onClick={() => send({ type: 'advance' })} className="btn-primary flex w-full items-center justify-center gap-2">
           <SkipForward className="h-5 w-5" /> Next (VIP)
         </button>

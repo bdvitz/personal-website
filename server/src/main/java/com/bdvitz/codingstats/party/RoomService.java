@@ -34,7 +34,8 @@ import java.util.concurrent.TimeUnit;
  *
  * Concurrency: each public operation locks the room it touches, and state is broadcast to
  * every connected screen after each change (full state, per recipient). One daemon thread
- * ticks rooms every second to enforce game deadlines and expire idle rooms.
+ * ticks rooms every 250ms (so phase changes land close to the on-screen countdowns) to enforce
+ * game deadlines and expire idle rooms.
  */
 @Service
 public class RoomService {
@@ -46,6 +47,7 @@ public class RoomService {
     private static final int CODE_LENGTH = 4;
     private static final int MAX_NAME_LENGTH = 16;
     private static final long CREATE_COOLDOWN_MS = 30_000;
+    private static final long TICK_MS = 250;
 
     static final String ATTR_ROOM = "partyRoom";
     static final String ATTR_PLAYER = "partyPlayerId";
@@ -74,7 +76,7 @@ public class RoomService {
         this.maxRooms = maxRooms;
         this.maxPlayers = maxPlayers;
         this.idleTimeoutMs = TimeUnit.MINUTES.toMillis(idleTimeoutMinutes);
-        ticker.scheduleAtFixedRate(this::tick, 1, 1, TimeUnit.SECONDS);
+        ticker.scheduleAtFixedRate(this::tick, TICK_MS, TICK_MS, TimeUnit.MILLISECONDS);
     }
 
     @PreDestroy
@@ -456,8 +458,10 @@ public class RoomService {
         if (room.getVipPlayerId() != null) {
             roomView.put("vipPlayerId", room.getVipPlayerId());
         }
-        roomView.put("players", room.getPlayers().stream().map(this::playerSummary).toList());
-        roomView.put("waiting", room.getWaiting().stream().map(this::playerSummary).toList());
+        // Private-score games: nobody (TV included) gets other players' totals until the game ends
+        boolean hideScores = room.getStatus() == RoomStatus.IN_GAME && room.getGame().hidesScores();
+        roomView.put("players", room.getPlayers().stream().map(p -> playerSummary(p, !hideScores)).toList());
+        roomView.put("waiting", room.getWaiting().stream().map(p -> playerSummary(p, !hideScores)).toList());
 
         Map<String, Object> msg = new LinkedHashMap<>();
         msg.put("type", "state");
@@ -474,7 +478,8 @@ public class RoomService {
                     "playerId", viewer.getId(),
                     "name", viewer.getName(),
                     "waiting", waiting,
-                    "vip", viewer.getId().equals(room.getVipPlayerId())));
+                    "vip", viewer.getId().equals(room.getVipPlayerId()),
+                    "score", viewer.getScore()));
             if (game != null && !waiting) {
                 msg.put("game", game.playerView(viewer));
             }
@@ -482,8 +487,15 @@ public class RoomService {
         return msg;
     }
 
-    private Map<String, Object> playerSummary(Player p) {
-        return Map.of("id", p.getId(), "name", p.getName(), "connected", p.isConnected(), "score", p.getScore());
+    private Map<String, Object> playerSummary(Player p, boolean includeScore) {
+        Map<String, Object> summary = new LinkedHashMap<>();
+        summary.put("id", p.getId());
+        summary.put("name", p.getName());
+        summary.put("connected", p.isConnected());
+        if (includeScore) {
+            summary.put("score", p.getScore());
+        }
+        return summary;
     }
 
     private Room requireRoom(String code) {
