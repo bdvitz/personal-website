@@ -52,7 +52,7 @@ export function ColorDilemmaHostView({ game, clockOffset }: HostViewProps) {
         {inResult ? 'Results are on your phones...' : 'Green or red? Decide in secret.'}
       </h2>
       <p className="text-center text-purple-200">
-        {inResult ? 'Next round starts soon.' : 'Both green: 3 each · Both red: 1 each · Red beats green: 5 to 0'}
+        {inResult ? 'Next round starts soon.' : 'Both green: 3 each · Both red: 1 each · Red beats green: 4 to 0'}
       </p>
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {game.pairs.map((pair: any) => (

@@ -55,7 +55,7 @@ class ColorDilemmaGameTest {
     void payoffMatrix() {
         assertEquals(3, ColorDilemmaGame.payoff(Choice.GREEN, Choice.GREEN));
         assertEquals(1, ColorDilemmaGame.payoff(Choice.RED, Choice.RED));
-        assertEquals(5, ColorDilemmaGame.payoff(Choice.RED, Choice.GREEN));
+        assertEquals(4, ColorDilemmaGame.payoff(Choice.RED, Choice.GREEN));
         assertEquals(0, ColorDilemmaGame.payoff(Choice.GREEN, Choice.RED));
     }
 
@@ -142,7 +142,7 @@ class ColorDilemmaGameTest {
 
         game.onTick(ROUND_MS);
         assertEquals("RESULT", phase(game));
-        assertEquals(5, a.getScore());
+        assertEquals(4, a.getScore());
         assertEquals(0, b.getScore());
         JsonNode result = json(game.playerView(b)).path("lastResult");
         assertEquals("GREEN", result.path("yourChoice").asText());

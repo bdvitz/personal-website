@@ -15,7 +15,7 @@ import java.util.Map;
 /**
  * Color Dilemma: a round-robin prisoner's dilemma. Each round players are paired (one bye per round when the count
  * is odd) and secretly toggle GREEN or RED for 25s; only the selection at the deadline counts.
- * GREEN/GREEN = 3 each, RED/RED = 1 each, RED vs GREEN = 5 / 0, bye = 2. Rounds = min(2(n-1), 12). A 5s result pause follows
+ * GREEN/GREEN = 3 each, RED/RED = 1 each, RED vs GREEN = 4 / 0, bye = 2. Rounds = min(2(n-1), 12). A 5s result pause follows
  * each round, then the next round starts automatically: there is no manual advance.
  *
  * Scores are private: each phone sees only its own points and its opponent's last choice. The TV
@@ -218,7 +218,7 @@ public class ColorDilemmaGame implements PartyGame {
         if (mine == Choice.GREEN) {
             return theirs == Choice.GREEN ? 3 : 0;
         }
-        return theirs == Choice.GREEN ? 5 : 1;
+        return theirs == Choice.GREEN ? 4 : 1;
     }
 
     private void award(String playerId, int points, Result result) {
