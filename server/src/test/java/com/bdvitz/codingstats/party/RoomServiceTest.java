@@ -200,14 +200,14 @@ class RoomServiceTest {
         Client alice = join("Alice");
         Client bob = join("Bob");
         assertEquals("NOT_ALLOWED", code(() -> service.start(bob.session, null)));
-        assertEquals("NOT_ALLOWED", code(() -> service.selectGame(bob.session, "mostlikely")));
+        assertEquals("NOT_ALLOWED", code(() -> service.selectGame(bob.session, "strikeout")));
         assertEquals("NOT_ALLOWED", code(() -> service.kick(bob.session, alice.playerId())));
         assertEquals("NOT_ALLOWED", code(() -> service.closeRoom(alice.session)), "VIP can't close the room");
 
-        service.selectGame(alice.session, "mostlikely");
-        assertEquals("mostlikely", host.state().path("room").path("selectedGameId").asText());
+        service.selectGame(alice.session, "strikeout");
+        assertEquals("strikeout", host.state().path("room").path("selectedGameId").asText());
         service.start(host.session, null);
-        assertEquals("mostlikely", bob.state().path("room").path("gameId").asText(), "start uses the selected game");
+        assertEquals("strikeout", bob.state().path("room").path("gameId").asText(), "start uses the selected game");
         assertEquals("NOT_ALLOWED", code(() -> service.advance(bob.session)));
         assertEquals("IN_GAME", code(() -> service.start(alice.session, null)));
     }
@@ -218,6 +218,43 @@ class RoomServiceTest {
         assertEquals("UNKNOWN_GAME", code(() -> service.selectGame(host.session, "nope")));
         assertEquals("UNKNOWN_GAME", code(() -> service.start(host.session, "nope")));
         assertEquals("colordilemma", host.state().path("room").path("selectedGameId").asText(), "default game");
+    }
+
+    @Test
+    void gameOptionsAreValidatedSharedAndUsedAtStart() throws Exception {
+        Client host = host();
+        Client alice = join("Alice");
+        Client bob = join("Bob");
+        assertTrue(host.state().path("room").path("gameOptions").isEmpty(), "default game has no options");
+        assertEquals("BAD_OPTION", code(() -> service.setGameOption(host.session, "timeLimit", 30)));
+
+        service.selectGame(host.session, "medianmadness");
+        assertEquals(60, alice.state().path("room").path("gameOptions").path("timeLimit").asInt(), "default shown");
+        assertEquals("NOT_ALLOWED", code(() -> service.setGameOption(bob.session, "timeLimit", 30)));
+        assertEquals("BAD_OPTION", code(() -> service.setGameOption(host.session, "timeLimit", 45)));
+        assertEquals("BAD_OPTION", code(() -> service.setGameOption(host.session, "timeLimit", null)));
+        assertEquals("BAD_OPTION", code(() -> service.setGameOption(host.session, "nope", 30)));
+
+        service.setGameOption(alice.session, "timeLimit", 30);
+        assertEquals(30, host.state().path("room").path("gameOptions").path("timeLimit").asInt());
+        service.start(host.session, null);
+        assertEquals(30, bob.state().path("game").path("timeLimit").asInt());
+        assertEquals("IN_GAME", code(() -> service.setGameOption(host.session, "timeLimit", 60)));
+    }
+
+    @Test
+    void controlActionsAreForHostOrVipDuringAGame() throws Exception {
+        Client host = host();
+        Client alice = join("Alice");
+        Client bob = join("Bob");
+        JsonNode startRound = MAPPER.createObjectNode().put("action", "startRound");
+        assertEquals("NOT_IN_GAME", code(() -> service.control(host.session, startRound)));
+
+        service.start(host.session, "cardconundrum");
+        assertEquals("NOT_ALLOWED", code(() -> service.control(bob.session, startRound)));
+        service.control(alice.session, startRound);
+        assertEquals("COUNTDOWN", bob.state().path("game").path("phase").asText());
+        assertThrows(IllegalArgumentException.class, () -> service.control(host.session, startRound), "wrong phase");
     }
 
     @Test
@@ -249,9 +286,9 @@ class RoomServiceTest {
     void hostCanResetScoresOnlyFromTheLobby() throws Exception {
         Client host = host();
         Client alice = join("Alice");
-        service.start(alice.session, "mostlikely");
-        JsonNode vote = MAPPER.createObjectNode().put("kind", "target").put("playerId", alice.playerId());
-        service.input(alice.session, vote); // solo player may vote for themselves -> 1 point
+        service.start(alice.session, "warmup");
+        JsonNode answer = MAPPER.createObjectNode().put("kind", "choice").put("index", 0);
+        service.input(alice.session, answer); // a solo poll answer is the majority -> 1 point
         assertEquals(1, host.state().path("room").path("players").get(0).path("score").asInt());
 
         assertEquals("NOT_IN_LOBBY", code(() -> service.resetScores(host.session)));

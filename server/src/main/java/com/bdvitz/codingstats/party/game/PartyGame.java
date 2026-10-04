@@ -4,6 +4,7 @@ import com.bdvitz.codingstats.party.model.Player;
 import com.fasterxml.jackson.databind.JsonNode;
 
 import java.util.List;
+import java.util.Map;
 
 /**
  * Contract every party game implements. One instance runs one game in one room.
@@ -21,6 +22,12 @@ public interface PartyGame {
     /** Registry id, also sent to the client to pick the matching views. */
     String id();
 
+    /**
+     * Called before {@link #start} with the lobby-chosen options (see {@link GameRegistry#resolve}),
+     * already validated and filled with defaults. Games without options ignore it.
+     */
+    default void configure(Map<String, Integer> options) {}
+
     /** Called once with the seated players (fixed for the whole game). */
     void start(List<Player> players, long now);
 
@@ -36,6 +43,14 @@ public interface PartyGame {
 
     /** Host or VIP pressed "Next" (skip a timer or leave a reveal screen). */
     boolean onAdvance(long now);
+
+    /**
+     * Host or VIP sent a game-specific action ({@code control{action}}, e.g. {@code {action:"eliminate", playerId}}).
+     * Throw IllegalArgumentException for an invalid or ill-timed action; the message is shown to the sender.
+     */
+    default boolean onControl(JsonNode action, long now) {
+        throw new IllegalArgumentException("Unexpected action");
+    }
 
     /** A player was kicked from the room mid-game. */
     default void onPlayerRemoved(Player player) {}

@@ -212,6 +212,24 @@ public class RoomService {
         }
     }
 
+    /** Host or VIP picks a lobby option (e.g. a time limit) for the selected game. */
+    public void setGameOption(WebSocketSession actor, String key, Integer value) {
+        Room room = roomOf(actor);
+        synchronized (room) {
+            requireController(room, actor);
+            if (room.getStatus() == RoomStatus.IN_GAME) {
+                throw new PartyException("IN_GAME", "A game is already running.");
+            }
+            String gameId = room.getSelectedGameId();
+            if (!GameRegistry.isValidOption(gameId, key, value)) {
+                throw new PartyException("BAD_OPTION", "That option isn't available.");
+            }
+            room.setGameOption(gameId, key, value);
+            room.touch(System.currentTimeMillis());
+            broadcast(room);
+        }
+    }
+
     /** Starts gameId, or the room's selected game when gameId is null. */
     public void start(WebSocketSession actor, String gameId) {
         Room room = roomOf(actor);
@@ -230,6 +248,7 @@ public class RoomService {
                 throw new PartyException("NO_PLAYERS", "Need at least one player to start.");
             }
             long now = System.currentTimeMillis();
+            game.configure(GameRegistry.resolve(id, room.getGameOptions(id)));
             game.start(new ArrayList<>(room.getPlayers()), now);
             room.setGame(game);
             room.setStatus(RoomStatus.IN_GAME);
@@ -247,6 +266,23 @@ public class RoomService {
             long now = System.currentTimeMillis();
             room.touch(now);
             if (room.getStatus() == RoomStatus.IN_GAME && room.getGame().onAdvance(now)) {
+                afterGameChange(room);
+                broadcast(room);
+            }
+        }
+    }
+
+    /** Host or VIP sends a game-specific action (see {@link PartyGame#onControl}). */
+    public void control(WebSocketSession actor, JsonNode action) {
+        Room room = roomOf(actor);
+        synchronized (room) {
+            requireController(room, actor);
+            if (room.getStatus() != RoomStatus.IN_GAME) {
+                throw new PartyException("NOT_IN_GAME", "No game is running.");
+            }
+            long now = System.currentTimeMillis();
+            room.touch(now);
+            if (room.getGame().onControl(action, now)) {
                 afterGameChange(room);
                 broadcast(room);
             }
@@ -455,6 +491,7 @@ public class RoomService {
             roomView.put("gameId", room.getGame().id());
         }
         roomView.put("selectedGameId", room.getSelectedGameId());
+        roomView.put("gameOptions", GameRegistry.resolve(room.getSelectedGameId(), room.getGameOptions(room.getSelectedGameId())));
         if (room.getVipPlayerId() != null) {
             roomView.put("vipPlayerId", room.getVipPlayerId());
         }

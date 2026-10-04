@@ -86,8 +86,10 @@ export default function PartyPlayPage() {
   const picker = (
     <GamePicker
       selectedId={room.selectedGameId}
+      options={room.gameOptions}
       label={room.status === 'GAME_OVER' && room.selectedGameId === room.gameId ? 'Play again' : 'Start'}
       onSelect={(gameId) => send({ type: 'selectGame', gameId })}
+      onOption={(key, value) => send({ type: 'setGameOption', key, value })}
       onStart={() => send({ type: 'start' })}
     />
   )
@@ -114,7 +116,7 @@ export default function PartyPlayPage() {
       </div>
     )
   } else if (definition && game) {
-    body = <definition.PlayerView game={game} room={room} you={you} clockOffset={clockOffset} sendInput={sendInput} />
+    body = <definition.PlayerView game={game} room={room} you={you} clockOffset={clockOffset} sendInput={sendInput} sendControl={(action) => send({ type: 'control', action })} />
   }
 
   return (

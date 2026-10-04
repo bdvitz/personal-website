@@ -16,7 +16,7 @@ import java.util.Map;
 /**
  * JSON protocol for /ws/party. Every message is {@code {type, ...}}.
  * Client to server: hostHello{code,hostToken}, join{code,name}, rejoin{code,token},
- * selectGame{gameId}, start{gameId?}, advance, input{input}, kick{playerId}, setVip{playerId}, resetScores, backToLobby, closeRoom, ping.
+ * selectGame{gameId}, setGameOption{key,value}, start{gameId?}, advance, control{action}, input{input}, kick{playerId}, setVip{playerId}, resetScores, backToLobby, closeRoom, ping.
  * Server to client: joined{playerId,token,code}, state{...}, error{code,message},
  * closed{message}, kicked, replaced, pong.
  */
@@ -61,8 +61,11 @@ public class PartyHandler extends TextWebSocketHandler {
                 case "join" -> roomService.join(out, text(msg, "code"), text(msg, "name"));
                 case "rejoin" -> roomService.rejoin(out, text(msg, "code"), text(msg, "token"));
                 case "selectGame" -> roomService.selectGame(out, text(msg, "gameId"));
+                case "setGameOption" -> roomService.setGameOption(out, text(msg, "key"),
+                        msg.path("value").canConvertToInt() && msg.path("value").isIntegralNumber() ? msg.path("value").asInt() : null);
                 case "start" -> roomService.start(out, text(msg, "gameId"));
                 case "advance" -> roomService.advance(out);
+                case "control" -> roomService.control(out, msg.path("action"));
                 case "input" -> roomService.input(out, msg.path("input"));
                 case "kick" -> roomService.kick(out, text(msg, "playerId"));
                 case "setVip" -> roomService.setVip(out, text(msg, "playerId"));

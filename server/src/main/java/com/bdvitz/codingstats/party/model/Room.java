@@ -4,8 +4,10 @@ import com.bdvitz.codingstats.party.game.PartyGame;
 import org.springframework.web.socket.WebSocketSession;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Stream;
@@ -29,6 +31,8 @@ public class Room {
     private PartyGame game;
     /** Game the next "start" will launch; shared so the TV and VIP phone show the same choice. */
     private String selectedGameId;
+    /** gameId -> option key -> value picked in the lobby (e.g. Median Madness timeLimit). */
+    private final Map<String, Map<String, Integer>> gameOptions = new HashMap<>();
     private boolean closed;
     private int nextPlayerNumber = 1;
 
@@ -59,6 +63,14 @@ public class Room {
 
     public String getSelectedGameId() { return selectedGameId; }
     public void setSelectedGameId(String selectedGameId) { this.selectedGameId = selectedGameId; }
+
+    public Map<String, Integer> getGameOptions(String gameId) {
+        return gameOptions.getOrDefault(gameId, Map.of());
+    }
+
+    public void setGameOption(String gameId, String key, int value) {
+        gameOptions.computeIfAbsent(gameId, id -> new HashMap<>()).put(key, value);
+    }
 
     public boolean isClosed() { return closed; }
     public void setClosed(boolean closed) { this.closed = closed; }

@@ -31,6 +31,27 @@ final class GameTestSupport {
         return MAPPER.createObjectNode().put("kind", "target").put("playerId", playerId);
     }
 
+    static JsonNode strike(String playerId, boolean on) {
+        return MAPPER.createObjectNode().put("kind", "strike").put("playerId", playerId).put("on", on);
+    }
+
+    static JsonNode cell(int row, int col) {
+        return MAPPER.createObjectNode().put("kind", "cell").put("row", row).put("col", col);
+    }
+
+    static JsonNode place(int ship, int row, int col, boolean vertical) {
+        return MAPPER.createObjectNode().put("kind", "place").put("ship", ship).put("row", row).put("col", col).put("vertical", vertical);
+    }
+
+    static JsonNode confirm(boolean on) {
+        return MAPPER.createObjectNode().put("kind", "confirm").put("on", on);
+    }
+
+    static JsonNode handoff(String playerId) {
+        var node = MAPPER.createObjectNode().put("kind", "handoff");
+        return playerId == null ? node : node.put("playerId", playerId);
+    }
+
     @SuppressWarnings("unchecked")
     static Map<String, Object> view(Object view) {
         return (Map<String, Object>) view;

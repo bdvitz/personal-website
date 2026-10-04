@@ -42,8 +42,10 @@ export default function PartyHostPage() {
   const picker = (
     <GamePicker
       selectedId={room.selectedGameId}
+      options={room.gameOptions}
       label={room.status === 'GAME_OVER' && room.selectedGameId === room.gameId ? 'Play again' : 'Start'}
       onSelect={(gameId) => send({ type: 'selectGame', gameId })}
+      onOption={(key, value) => send({ type: 'setGameOption', key, value })}
       onStart={() => send({ type: 'start' })}
     />
   )
@@ -77,7 +79,7 @@ export default function PartyHostPage() {
               </div>
             </div>
           ) : definition ? (
-            <definition.HostView game={game} room={room} clockOffset={clockOffset} />
+            <definition.HostView game={game} room={room} clockOffset={clockOffset} sendControl={(action) => send({ type: 'control', action })} />
           ) : null}
         </main>
 

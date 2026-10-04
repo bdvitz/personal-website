@@ -57,4 +57,19 @@ class PartyInputsTest {
         assertThrows(IllegalArgumentException.class, () -> PartyInputs.target(json("{\"kind\":\"target\"}")));
         assertThrows(IllegalArgumentException.class, () -> PartyInputs.target(json("{\"kind\":\"choice\",\"playerId\":\"p2\"}")));
     }
+
+    @Test
+    void strikeAcceptsATargetAndABooleanState() throws Exception {
+        assertEquals(new PartyInputs.Strike("p2", true), PartyInputs.strike(json("{\"kind\":\"strike\",\"playerId\":\"p2\",\"on\":true}")));
+        assertEquals(new PartyInputs.Strike("p2", false), PartyInputs.strike(json("{\"kind\":\"strike\",\"playerId\":\"p2\",\"on\":false}")));
+    }
+
+    @Test
+    void strikeRejectsMissingOrNonBooleanStateBlankIdAndWrongKind() {
+        assertThrows(IllegalArgumentException.class, () -> PartyInputs.strike(json("{\"kind\":\"strike\",\"playerId\":\"p2\"}")));
+        assertThrows(IllegalArgumentException.class, () -> PartyInputs.strike(json("{\"kind\":\"strike\",\"playerId\":\"p2\",\"on\":\"true\"}")));
+        assertThrows(IllegalArgumentException.class, () -> PartyInputs.strike(json("{\"kind\":\"strike\",\"playerId\":\"p2\",\"on\":1}")));
+        assertThrows(IllegalArgumentException.class, () -> PartyInputs.strike(json("{\"kind\":\"strike\",\"playerId\":\"\",\"on\":true}")));
+        assertThrows(IllegalArgumentException.class, () -> PartyInputs.strike(json("{\"kind\":\"target\",\"playerId\":\"p2\",\"on\":true}")));
+    }
 }
