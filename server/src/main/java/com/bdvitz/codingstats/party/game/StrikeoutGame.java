@@ -14,7 +14,7 @@ import java.util.Map;
 import java.util.Set;
 
 /**
- * One 60s round: every player can hand out up to 3 strikes (fewer when there are fewer than 4 players),
+ * One 120s round: every player can hand out up to 3 strikes (fewer when there are fewer than 4 players),
  * at most one per other player, and can take them back until the timer ends. Unused strikes are forfeit.
  * Each strike received costs 1 room point.
  *
@@ -27,7 +27,7 @@ public class StrikeoutGame implements PartyGame {
     public static final String ID = "strikeout";
 
     static final int MAX_STRIKES = 3;
-    static final long ROUND_MS = 60_000;
+    static final long ROUND_MS = 120_000;
     static final long PUBLISH_MS = 1_000;
 
     private enum Phase { PLAY, FINAL }

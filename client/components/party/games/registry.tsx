@@ -40,7 +40,7 @@ export const PARTY_GAMES: Record<string, PartyGameDefinition> = {
   },
   strikeout: {
     name: 'Strikeout',
-    description: '60 seconds to hand out 3 strikes to 3 different players. Each strike you end with costs a point.',
+    description: '120 seconds to hand out 3 strikes to 3 different players. Each strike you end with costs a point.',
     HostView: StrikeoutHostView,
     PlayerView: StrikeoutPlayerView,
     automatic: true,
