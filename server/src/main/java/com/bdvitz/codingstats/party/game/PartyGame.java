@@ -63,6 +63,14 @@ public interface PartyGame {
         return false;
     }
 
+    /**
+     * True for games with nothing to show once they end (e.g. no scores): finishing skips GAME_OVER and
+     * goes straight back to the lobby, seating waiting players like {@code backToLobby}.
+     */
+    default boolean returnsToLobby() {
+        return false;
+    }
+
     /** Payload for the TV screen. Must be JSON-serializable. */
     Object hostView();
 

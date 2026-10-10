@@ -310,10 +310,7 @@ public class RoomService {
         Room room = roomOf(actor);
         synchronized (room) {
             requireController(room, actor);
-            room.getPlayers().addAll(room.getWaiting());
-            room.getWaiting().clear();
-            room.setGame(null);
-            room.setStatus(RoomStatus.LOBBY);
+            returnToLobby(room);
             room.touch(System.currentTimeMillis());
             broadcast(room);
         }
@@ -450,8 +447,20 @@ public class RoomService {
 
     private void afterGameChange(Room room) {
         if (room.getStatus() == RoomStatus.IN_GAME && room.getGame().isFinished()) {
-            room.setStatus(RoomStatus.GAME_OVER);
+            if (room.getGame().returnsToLobby()) {
+                returnToLobby(room);
+            } else {
+                room.setStatus(RoomStatus.GAME_OVER);
+            }
         }
+    }
+
+    /** Seats waiting players and drops the game. Caller holds the room lock and broadcasts. */
+    private void returnToLobby(Room room) {
+        room.getPlayers().addAll(room.getWaiting());
+        room.getWaiting().clear();
+        room.setGame(null);
+        room.setStatus(RoomStatus.LOBBY);
     }
 
     private void close(Room room, String reason) {

@@ -271,6 +271,22 @@ class RoomServiceTest {
     }
 
     @Test
+    void lobbyReturningGameSkipsGameOverAndSeatsWaitingPlayers() throws Exception {
+        Client host = host();
+        Client alice = join("Alice");
+        join("Bob");
+        service.start(host.session, "teamassignment");
+        Client carol = join("Carol");
+        assertTrue(carol.state().path("you").path("waiting").asBoolean());
+
+        service.control(alice.session, MAPPER.createObjectNode().put("action", "exit"));
+        assertEquals("LOBBY", host.state().path("room").path("status").asText());
+        assertTrue(host.state().path("game").isMissingNode());
+        assertEquals(3, host.state().path("room").path("players").size(), "waiting player seated");
+        assertFalse(carol.state().path("you").path("waiting").asBoolean());
+    }
+
+    @Test
     void onlyHostCanChangeVip() throws Exception {
         Client host = host();
         Client alice = join("Alice");

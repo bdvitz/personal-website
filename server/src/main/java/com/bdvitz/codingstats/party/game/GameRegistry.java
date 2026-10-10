@@ -20,7 +20,8 @@ public final class GameRegistry {
             ColorDilemmaGame.ID, ColorDilemmaGame::new,
             MedianMadnessGame.ID, MedianMadnessGame::new,
             CardConundrumGame.ID, CardConundrumGame::new,
-            BuoyantBattleGame.ID, BuoyantBattleGame::new
+            BuoyantBattleGame.ID, BuoyantBattleGame::new,
+            TeamAssignmentGame.ID, TeamAssignmentGame::new
     );
 
     /** gameId -> option key -> spec. Keep in sync with `options` in the client registry. */

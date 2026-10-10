@@ -6,6 +6,7 @@ import { ColorDilemmaHostView, ColorDilemmaPlayerView } from './colordilemma/Col
 import { MedianMadnessHostView, MedianMadnessPlayerView } from './medianmadness/MedianMadnessViews'
 import { CardConundrumHostView, CardConundrumPlayerView } from './cardconundrum/CardConundrumViews'
 import { BuoyantBattleHostView, BuoyantBattlePlayerView } from './buoyantbattle/BuoyantBattleViews'
+import { TeamAssignmentHostView, TeamAssignmentPlayerView } from './teamassignment/TeamAssignmentViews'
 
 // A lobby choice for a game; keys and values must match GameRegistry.OPTIONS on the server
 export interface PartyGameOption {
@@ -68,7 +69,14 @@ export const PARTY_GAMES: Record<string, PartyGameDefinition> = {
     PlayerView: BuoyantBattlePlayerView,
     automatic: true, // runs on timers; has its own close/end/pause buttons
   },
+  teamassignment: {
+    name: 'Team Assignment',
+    description: 'No points: shuffles everyone into random lettered teams of a chosen max size. Reroll until it feels fair.',
+    HostView: TeamAssignmentHostView,
+    PlayerView: TeamAssignmentPlayerView,
+    automatic: true, // has its own reroll/change size/exit buttons
+  },
 }
 
 // Display order in the game picker
-export const GAME_ORDER = ['colordilemma', 'strikeout', 'medianmadness', 'cardconundrum', 'buoyantbattle', 'warmup']
+export const GAME_ORDER = ['colordilemma', 'strikeout', 'medianmadness', 'cardconundrum', 'buoyantbattle', 'teamassignment', 'warmup']
