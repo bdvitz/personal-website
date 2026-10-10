@@ -14,9 +14,10 @@ import java.util.Map;
 
 /**
  * Color Dilemma: a round-robin prisoner's dilemma. Each round players are paired (one bye per round when the count
- * is odd) and secretly toggle GREEN or RED for 25s; only the selection at the deadline counts.
- * GREEN/GREEN = 3 each, RED/RED = 1 each, RED vs GREEN = 4 / 0, bye = 2. Rounds = min(2(n-1), 12). A 5s result pause follows
- * each round, then the next round starts automatically: there is no manual advance.
+ * is odd) and secretly toggle GREEN or RED; only the selection at the deadline counts.
+ * GREEN/GREEN = 3 each, RED/RED = 1 each, RED vs GREEN = 4 / 0, bye = 2. Every pair meets 3 times: the first cycle
+ * has 25s rounds with a 5s result pause, the second and third are fast (10s rounds, 3s results). The next round
+ * starts automatically: there is no manual advance.
  *
  * Scores are private: each phone sees only its own points and its opponent's last choice. The TV
  * sees pairings only, until the final standings (totals only, never who picked what).
@@ -27,7 +28,9 @@ public class ColorDilemmaGame implements PartyGame {
 
     static final long ROUND_MS = 25_000;
     static final long RESULT_MS = 5_000;
-    static final int MAX_ROUNDS = 12;
+    static final long FAST_ROUND_MS = 10_000;
+    static final long FAST_RESULT_MS = 3_000;
+    static final int CYCLES = 3;
     static final int BYE_POINTS = 2;
 
     enum Choice { GREEN, RED }
@@ -53,12 +56,23 @@ public class ColorDilemmaGame implements PartyGame {
     private final Map<String, Integer> gamePoints = new HashMap<>();
     private final Map<String, Result> lastResults = new HashMap<>();
     private List<List<Pair>> schedule = new ArrayList<>();
+    private int cycleLength;
     private int roundIndex;
     private Phase phase;
     private long deadline;
 
+    /** Rounds in one cycle, where every pair meets once (an odd count adds a bye slot). */
+    static int cycleLength(int players) {
+        return players % 2 == 0 ? players - 1 : players;
+    }
+
     static int roundCount(int players) {
-        return Math.min(2 * (players - 1), MAX_ROUNDS);
+        return CYCLES * cycleLength(players);
+    }
+
+    /** Rematch rounds (every cycle after the first) run on the short timers. */
+    private boolean fast() {
+        return roundIndex >= cycleLength;
     }
 
     @Override
@@ -80,6 +94,7 @@ public class ColorDilemmaGame implements PartyGame {
         players.forEach(p -> byId.put(p.getId(), p));
         List<String> ids = new ArrayList<>(players.stream().map(Player::getId).toList());
         Collections.shuffle(ids);
+        cycleLength = cycleLength(ids.size());
         schedule = buildSchedule(ids, roundCount(ids.size()));
         roundIndex = 0;
         startRound(now);
@@ -145,7 +160,7 @@ public class ColorDilemmaGame implements PartyGame {
         if (phase == Phase.ROUND && now >= deadline) {
             scoreRound();
             phase = Phase.RESULT;
-            deadline = now + RESULT_MS;
+            deadline = now + (fast() ? FAST_RESULT_MS : RESULT_MS);
             return true;
         }
         if (phase == Phase.RESULT && now >= deadline) {
@@ -198,7 +213,7 @@ public class ColorDilemmaGame implements PartyGame {
         lastResults.clear();
         participants.forEach(p -> choices.put(p.getId(), Choice.GREEN));
         phase = Phase.ROUND;
-        deadline = now + ROUND_MS;
+        deadline = now + (fast() ? FAST_ROUND_MS : ROUND_MS);
     }
 
     private void scoreRound() {
@@ -238,6 +253,7 @@ public class ColorDilemmaGame implements PartyGame {
         view.put("phase", phase.name());
         view.put("round", roundIndex + 1);
         view.put("rounds", schedule.size());
+        view.put("fast", fast());
         if (deadline > 0) {
             view.put("deadline", deadline);
         }

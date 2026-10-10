@@ -18,6 +18,8 @@ import java.util.stream.IntStream;
 import static com.bdvitz.codingstats.party.game.GameTestSupport.choice;
 import static com.bdvitz.codingstats.party.game.GameTestSupport.json;
 import static com.bdvitz.codingstats.party.game.GameTestSupport.player;
+import static com.bdvitz.codingstats.party.game.ColorDilemmaGame.FAST_RESULT_MS;
+import static com.bdvitz.codingstats.party.game.ColorDilemmaGame.FAST_ROUND_MS;
 import static com.bdvitz.codingstats.party.game.ColorDilemmaGame.RESULT_MS;
 import static com.bdvitz.codingstats.party.game.ColorDilemmaGame.ROUND_MS;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -60,13 +62,14 @@ class ColorDilemmaGameTest {
     }
 
     @Test
-    void roundCountIsTwiceOpponentsCappedAtTwelve() {
-        assertEquals(2, ColorDilemmaGame.roundCount(2));
-        assertEquals(4, ColorDilemmaGame.roundCount(3));
-        assertEquals(10, ColorDilemmaGame.roundCount(6));
-        assertEquals(12, ColorDilemmaGame.roundCount(7));
-        assertEquals(12, ColorDilemmaGame.roundCount(8));
-        assertEquals(12, ColorDilemmaGame.roundCount(15));
+    void roundCountIsThreeFullCycles() {
+        assertEquals(3, ColorDilemmaGame.roundCount(2));
+        assertEquals(9, ColorDilemmaGame.roundCount(3));
+        assertEquals(15, ColorDilemmaGame.roundCount(6));
+        assertEquals(21, ColorDilemmaGame.roundCount(7));
+        assertEquals(21, ColorDilemmaGame.roundCount(8));
+        assertEquals(45, ColorDilemmaGame.roundCount(15));
+        assertEquals(45, ColorDilemmaGame.roundCount(16));
     }
 
     @Test
@@ -101,7 +104,8 @@ class ColorDilemmaGameTest {
                 assertEquals(n, seen.size(), "everyone plays or has the bye every round (n=" + n + ")");
                 assertEquals(n % 2, byes, "exactly one bye when odd (n=" + n + ")");
             }
-            meetings.values().forEach(count -> assertTrue(count <= 2, "a pair meets at most twice"));
+            assertEquals(n * (n - 1) / 2, meetings.size(), "every pair meets (n=" + n + ")");
+            meetings.values().forEach(count -> assertEquals(3, count, "every pair meets exactly 3 times"));
         }
     }
 
@@ -166,25 +170,28 @@ class ColorDilemmaGameTest {
         ColorDilemmaGame game = new ColorDilemmaGame();
         game.start(ps, 0);
         long t = 0;
-        for (int round = 1; round <= 4; round++) {
+        for (int round = 1; round <= 9; round++) {
+            // the first cycle (3 rounds) is slow, the two rematch cycles are fast
+            boolean fast = round > 3;
+            long roundMs = fast ? FAST_ROUND_MS : ROUND_MS;
+            long resultMs = fast ? FAST_RESULT_MS : RESULT_MS;
             assertEquals("ROUND", phase(game));
             assertEquals(round, json(game.hostView()).path("round").asInt());
-            assertEquals(4, json(game.hostView()).path("rounds").asInt());
-            assertFalse(game.onTick(t + ROUND_MS - 1), "round lasts 25s");
+            assertEquals(9, json(game.hostView()).path("rounds").asInt());
+            assertEquals(fast, json(game.hostView()).path("fast").asBoolean());
+            assertFalse(game.onTick(t + roundMs - 1), "round lasts 25s, or 10s for rematches");
             assertFalse(game.onAdvance(t + 1), "no manual skipping");
-            t += ROUND_MS;
+            t += roundMs;
             assertTrue(game.onTick(t));
             assertEquals("RESULT", phase(game));
-            assertFalse(game.onTick(t + RESULT_MS - 1), "result pause lasts 5s");
-            t += RESULT_MS;
+            assertFalse(game.onTick(t + resultMs - 1), "result pause lasts 5s, or 3s for rematches");
+            t += resultMs;
             assertTrue(game.onTick(t));
         }
         assertTrue(game.isFinished());
         assertEquals(3, json(game.hostView()).path("standings").size());
-        // 3 players, all GREEN, 4 rounds: each round the pair gets 3 each and the bye gets 2 -> 8 per round
-        assertEquals(32, ps.stream().mapToInt(Player::getScore).sum());
-        // one cycle gives everyone one bye (11 pts); the 4th round gives one player a second bye (10 pts)
-        ps.forEach(p -> assertTrue(p.getScore() == 10 || p.getScore() == 11, "score " + p.getScore()));
+        // 3 players, all GREEN, 3 cycles: each cycle is two matches (3 pts each) and one bye (2 pts) per player
+        ps.forEach(p -> assertEquals(24, p.getScore()));
     }
 
     @Test

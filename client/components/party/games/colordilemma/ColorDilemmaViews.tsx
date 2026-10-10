@@ -21,6 +21,7 @@ function RoundHeader({ game, clockOffset, large = false }: { game: any; clockOff
     <div className="flex items-center justify-between gap-3">
       <p className={`font-semibold uppercase tracking-widest text-purple-300 ${large ? 'text-lg' : 'text-sm'}`}>
         Round {game.round} of {game.rounds}
+        {game.fast && <span className="ml-2 text-pink-300">· Speed round</span>}
       </p>
       <Countdown deadline={game.deadline} clockOffset={clockOffset} large={large} />
     </div>
