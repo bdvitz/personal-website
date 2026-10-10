@@ -19,7 +19,7 @@ import java.util.Random;
  * elects a leader who does all of the team's actions, places ships of lengths 3, 2 and 2, and then both teams
  * bomb each other simultaneously until a fleet is sunk.
  *
- * Flow: ELECTION (60s) -> PLACE (120s) -> BOMB (25s) -> RESULT (3s) -> BOMB ... -> FINAL.
+ * Flow: ELECTION (60s) -> PLACE (120s) -> BOMB (60s) -> RESULT (3s) -> BOMB ... -> FINAL.
  * ELECTION ends early once every connected voter has voted, PLACE once both leaders are ready, BOMB once both
  * leaders have confirmed. The host/VIP can close voting, end placement, pause/resume ({@link #onControl}),
  * and skip the RESULT popup (Next).
@@ -35,7 +35,7 @@ public class BuoyantBattleGame implements PartyGame {
 
     static final long ELECTION_MS = 60_000;
     static final long PLACE_MS = 120_000;
-    static final long BOMB_MS = 25_000;
+    static final long BOMB_MS = 60_000;
     static final long RESULT_MS = 3_000;
     static final int SIZE = 5;
     static final List<Integer> SHIP_LENGTHS = List.of(3, 2, 2);
