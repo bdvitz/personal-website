@@ -46,10 +46,14 @@ export function useCachedChessData(): UseCachedChessDataReturn {
       return false
     }
 
-    const cachedStart = new Date(fetchedRange.startYear, fetchedRange.startMonth - 1, 1)
-    const cachedEnd = new Date(fetchedRange.endYear, fetchedRange.endMonth, 0) // Last day of month
+    // Compare whole months: the cached range covers its end month through the last millisecond,
+    // so a time-of-day on the last day of the month must still count as cached
+    const cachedStart = fetchedRange.startYear * 12 + fetchedRange.startMonth - 1
+    const cachedEnd = fetchedRange.endYear * 12 + fetchedRange.endMonth - 1
+    const requestedStart = startDate.getFullYear() * 12 + startDate.getMonth()
+    const requestedEnd = endDate.getFullYear() * 12 + endDate.getMonth()
 
-    return startDate >= cachedStart && endDate <= cachedEnd
+    return requestedStart >= cachedStart && requestedEnd <= cachedEnd
   }
 
   /**

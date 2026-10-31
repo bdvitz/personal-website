@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { Trophy, TrendingUp, RefreshCw, Target, Zap, Clock, User, Search, Calendar } from 'lucide-react'
 import RatingChart from './components/RatingChart'
 import StatsCard from './components/StatsCard'
@@ -20,10 +20,9 @@ export default function ChessPage() {
   const FIRST_YEAR = 2020
 
   const cacheHook = useCachedChessData()
-  const { isCached, getCachedDataForRange, storeCachedData } = cacheHook
+  const { cachedData, storeCachedData } = cacheHook
 
   const [stats, setStats] = useState<ChessStats | null>(null)
-  const [chartData, setChartData] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -111,16 +110,17 @@ export default function ChessPage() {
 
   // Load snapshot data on mount, then replace stats with the database copy if the server is up
   const loadSnapshotOnMount = async () => {
+    let snapshotLoaded = false
     try {
-      const snapshot = await loadSnapshotData(timeOption)
+      const snapshot = await loadSnapshotData('all')
       if (snapshot) {
         setStats(snapshot.stats)
-        setChartData(snapshot.chartData)
         setUsingSnapshot(true)
 
-        // Populate cache with snapshot data
-        const { startDate, endDate } = calculateDateRange(timeOption)
+        // Populate cache with the full snapshot history; the chart is derived from the cache
+        const { startDate, endDate } = calculateDateRange('all')
         storeCachedData(snapshot.historicalData, startDate, endDate)
+        snapshotLoaded = true
 
         console.log('Loaded snapshot data from', new Date(snapshot.generatedAt).toLocaleString())
       }
@@ -139,34 +139,17 @@ export default function ChessPage() {
       } catch (err: any) {
         console.error('Failed to fetch stored stats:', err)
       }
-    }
 
-    setLoading(false)
-  }
-
-  // Refresh chart from cache when time period changes
-  const refreshChartFromCache = (newTimeOption: string) => {
-    const { startDate, endDate } = calculateDateRange(
-      newTimeOption,
-      { year: customStartYear, month: customStartMonth },
-      { year: customEndYear, month: customEndMonth }
-    )
-
-    // Check if we have cached data for this range
-    if (isCached(startDate, endDate)) {
-      const cachedRatings = getCachedDataForRange(startDate, endDate)
-      if (cachedRatings) {
-        const newChartData = formatChartDataFromRatings(cachedRatings, startDate, endDate)
-        setChartData(newChartData)
-        return true // Successfully used cache
+      // The snapshot is regenerated manually and goes stale, so top up the cache from the database.
+      // Hybrid fetch only requests the months from the snapshot's last month onward (usually 1-2 calls).
+      if (snapshotLoaded) {
+        const { startDate, endDate } = calculateDateRange('all')
+        setIsFetching(true)
+        setFetchParams({ username: DEFAULT_USERNAME, startDate, endDate })
       }
     }
 
-    // Not cached - create empty chart with correct x-axis range (all null values)
-    // This ensures the x-axis adjusts to show the selected time period
-    const emptyChartData = formatChartDataFromRatings([], startDate, endDate)
-    setChartData(emptyChartData)
-    return true // Chart updated with empty data to show correct time range
+    setLoading(false)
   }
 
   // Re-read current stats from the database
@@ -223,15 +206,20 @@ export default function ChessPage() {
     loadSnapshotOnMount()
   }, [])
 
-  // Re-render chart when time period changes (use cache if available)
-  useEffect(() => {
-    if (!chartData) return // No chart yet
-
-    // Try to refresh from cache
-    refreshChartFromCache(timeOption)
-
-    // If not in cache, user needs to click "Load Rating from Database"
-  }, [timeOption, customStartYear, customStartMonth, customEndYear, customEndMonth])
+  // Chart is derived from the cache and the selected period, so switching periods or loading
+  // more history always re-plots whatever data is cached for that range
+  const chartData = useMemo(() => {
+    if (cachedData.length === 0) return null
+    const { startDate, endDate } = calculateDateRange(
+      timeOption,
+      { year: customStartYear, month: customStartMonth },
+      { year: customEndYear, month: customEndMonth }
+    )
+    const startStr = startDate.toISOString().split('T')[0]
+    const endStr = endDate.toISOString().split('T')[0]
+    const ratings = cachedData.filter(rating => rating.date >= startStr && rating.date <= endStr)
+    return formatChartDataFromRatings(ratings, startDate, endDate)
+  }, [cachedData, timeOption, customStartYear, customStartMonth, customEndYear, customEndMonth])
 
   if (loading) {
     return (
@@ -414,10 +402,8 @@ export default function ChessPage() {
         isActive={isFetching}
         useHybridFetch
         cacheHook={cacheHook}
-        onDataFetched={(data) => {
-          const { startDate, endDate } = fetchParams!
-          const newChartData = formatChartDataFromRatings(data, startDate, endDate)
-          setChartData(newChartData)
+        onDataFetched={() => {
+          // The fetcher merged the data into the cache, which re-derives chartData
           setIsFetching(false)
           setUsingSnapshot(false)
         }}
